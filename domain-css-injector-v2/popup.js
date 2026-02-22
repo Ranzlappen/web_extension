@@ -1,5 +1,6 @@
 let currentDomain = null;
 let englishVoice;
+let videoCandidates = [];
 
 speechSynthesis.onvoiceschanged = () => {
   const voices = speechSynthesis.getVoices();
@@ -93,6 +94,102 @@ async function updateActiveTab() {
     const domain = getBaseDomain(new URL(tab.url).hostname);
     if (domain !== currentDomain) refreshDomain(domain);
 }
+
+async function fetchVideoSourcesFromActiveTab() {
+    const tab = await queryActiveTab();
+    if (!tab || !tab.id) {
+        setStatus('No active tab detected.');
+        return [];
+    }
+
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+            const urls = new Set();
+            const videos = Array.from(document.querySelectorAll('video'));
+
+            videos.forEach((video) => {
+                if (video.currentSrc) urls.add(video.currentSrc);
+                if (video.src) urls.add(video.src);
+                Array.from(video.querySelectorAll('source')).forEach((source) => {
+                    if (source.src) urls.add(source.src);
+                });
+            });
+
+            return Array.from(urls).filter(Boolean);
+        }
+    });
+
+    const mediaUrls = results && results[0] && Array.isArray(results[0].result)
+        ? results[0].result
+        : [];
+
+    return mediaUrls;
+}
+
+function resetVideoPicker() {
+    videoCandidates = [];
+    const picker = document.getElementById('videoPicker');
+    const select = document.getElementById('videoSelect');
+    if (select) {
+        select.innerHTML = '';
+    }
+    if (picker) {
+        picker.style.display = 'none';
+    }
+}
+
+function showVideoPicker(mediaUrls) {
+    const picker = document.getElementById('videoPicker');
+    const select = document.getElementById('videoSelect');
+    if (!picker || !select) {
+        setStatus('Video picker UI is unavailable.');
+        return;
+    }
+
+    videoCandidates = mediaUrls;
+    select.innerHTML = '';
+
+    mediaUrls.forEach((url, i) => {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = `${i + 1}. ${url}`;
+        select.appendChild(option);
+    });
+
+    picker.style.display = 'block';
+    setStatus('Choose a video then click Download Selected Video.', 3000);
+}
+
+function startVideoDownload(selectedUrl) {
+    chrome.downloads.download({
+        url: selectedUrl,
+        conflictAction: 'uniquify'
+    }, (downloadId) => {
+        if (chrome.runtime.lastError || !downloadId) {
+            setStatus(`Download failed: ${chrome.runtime.lastError?.message || 'Unknown error'}`, 3000);
+            return;
+        }
+        setStatus('Video download started.', 3000);
+        resetVideoPicker();
+    });
+}
+
+async function chooseAndDownloadVideo() {
+    const mediaUrls = await fetchVideoSourcesFromActiveTab();
+    if (!mediaUrls.length) {
+        setStatus('No video media found on this page.');
+        resetVideoPicker();
+        return;
+    }
+
+    if (mediaUrls.length === 1) {
+        startVideoDownload(mediaUrls[0]);
+        return;
+    }
+
+    showVideoPicker(mediaUrls);
+}
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== currentDomain) {
         refreshDomain(msg.domain);
@@ -105,6 +202,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+    const confirmVideoDownloadBtn = document.getElementById('confirmVideoDownloadBtn');
+    const cancelVideoDownloadBtn = document.getElementById('cancelVideoDownloadBtn');
     const tab = await queryActiveTab();
     if (tab && tab.url) {
         refreshDomain(getBaseDomain(new URL(tab.url).hostname));
@@ -114,6 +214,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveBtn.addEventListener('click', () => saveCSS(cssInput.value));
     deleteBtn.addEventListener('click', deleteCSS);
     refreshBtn.addEventListener('click', refreshList);
+    if (downloadVideoBtn) {
+        downloadVideoBtn.addEventListener('click', chooseAndDownloadVideo);
+    }
+    if (confirmVideoDownloadBtn) {
+        confirmVideoDownloadBtn.addEventListener('click', () => {
+            const selectedIndex = Number(document.getElementById('videoSelect')?.value);
+            if (Number.isNaN(selectedIndex) || !videoCandidates[selectedIndex]) {
+                setStatus('Please select a video to download.');
+                return;
+            }
+            startVideoDownload(videoCandidates[selectedIndex]);
+        });
+    }
+    if (cancelVideoDownloadBtn) {
+        cancelVideoDownloadBtn.addEventListener('click', () => {
+            resetVideoPicker();
+            setStatus('Download cancelled.');
+        });
+    }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
             const data = JSON.stringify(items, null, 2);

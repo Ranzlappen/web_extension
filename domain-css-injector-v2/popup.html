@@ -42,6 +42,17 @@ body    {style:example;}
 			<button id="readTextBtn">Read Selected Text</button>
 			<button id="stopReadBtn">Stop Reading</button>
         </div>
+		<h4>Media</h4>
+		<div class="controls">
+			<button id="downloadVideoBtn">Download Video Media</button>
+		</div>
+		<div id="videoPicker" style="display:none;margin-top:8px;">
+			<select id="videoSelect" style="width:100%;padding:8px;margin-bottom:6px;"></select>
+			<div class="controls">
+				<button id="confirmVideoDownloadBtn">Download Selected Video</button>
+				<button id="cancelVideoDownloadBtn">Cancel</button>
+			</div>
+		</div>
         <h4>Saved snippets</h4>
         <div class="controls">
             <button id="refreshBtn">Refresh list</button>
