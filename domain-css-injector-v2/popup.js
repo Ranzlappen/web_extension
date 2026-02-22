@@ -93,6 +93,74 @@ async function updateActiveTab() {
     const domain = getBaseDomain(new URL(tab.url).hostname);
     if (domain !== currentDomain) refreshDomain(domain);
 }
+
+async function fetchVideoSourcesFromActiveTab() {
+    const tab = await queryActiveTab();
+    if (!tab || !tab.id) {
+        setStatus('No active tab detected.');
+        return [];
+    }
+
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+            const urls = new Set();
+            const videos = Array.from(document.querySelectorAll('video'));
+
+            videos.forEach((video) => {
+                if (video.currentSrc) urls.add(video.currentSrc);
+                if (video.src) urls.add(video.src);
+                Array.from(video.querySelectorAll('source')).forEach((source) => {
+                    if (source.src) urls.add(source.src);
+                });
+            });
+
+            return Array.from(urls).filter(Boolean);
+        }
+    });
+
+    const mediaUrls = results && results[0] && Array.isArray(results[0].result)
+        ? results[0].result
+        : [];
+
+    return mediaUrls;
+}
+
+async function chooseAndDownloadVideo() {
+    const mediaUrls = await fetchVideoSourcesFromActiveTab();
+    if (!mediaUrls.length) {
+        setStatus('No video media found on this page.');
+        return;
+    }
+
+    const options = mediaUrls
+        .map((url, i) => `${i + 1}. ${url}`)
+        .join('\n');
+
+    const selection = prompt(`Select video to download:
+
+${options}
+
+Enter number:`);
+    const selectionNumber = Number(selection);
+
+    if (!selection || Number.isNaN(selectionNumber) || selectionNumber < 1 || selectionNumber > mediaUrls.length) {
+        setStatus('Download cancelled.');
+        return;
+    }
+
+    const selectedUrl = mediaUrls[selectionNumber - 1];
+    chrome.downloads.download({
+        url: selectedUrl,
+        conflictAction: 'uniquify'
+    }, (downloadId) => {
+        if (chrome.runtime.lastError || !downloadId) {
+            setStatus(`Download failed: ${chrome.runtime.lastError?.message || 'Unknown error'}`, 3000);
+            return;
+        }
+        setStatus('Video download started.', 3000);
+    });
+}
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== currentDomain) {
         refreshDomain(msg.domain);
@@ -105,6 +173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
     const tab = await queryActiveTab();
     if (tab && tab.url) {
         refreshDomain(getBaseDomain(new URL(tab.url).hostname));
@@ -114,6 +183,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveBtn.addEventListener('click', () => saveCSS(cssInput.value));
     deleteBtn.addEventListener('click', deleteCSS);
     refreshBtn.addEventListener('click', refreshList);
+    if (downloadVideoBtn) {
+        downloadVideoBtn.addEventListener('click', chooseAndDownloadVideo);
+    }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
             const data = JSON.stringify(items, null, 2);
