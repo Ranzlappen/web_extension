@@ -127,41 +127,30 @@ async function fetchVideoSourcesFromActiveTab() {
     return mediaUrls;
 }
 
-function resetVideoPicker() {
-    videoCandidates = [];
-    const picker = document.getElementById('videoPicker');
-    const select = document.getElementById('videoSelect');
-    if (select) {
-        select.innerHTML = '';
-    }
-    if (picker) {
-        picker.style.display = 'none';
-    }
-}
-
-function showVideoPicker(mediaUrls) {
-    const picker = document.getElementById('videoPicker');
-    const select = document.getElementById('videoSelect');
-    if (!picker || !select) {
-        setStatus('Video picker UI is unavailable.');
+async function chooseAndDownloadVideo() {
+    const mediaUrls = await fetchVideoSourcesFromActiveTab();
+    if (!mediaUrls.length) {
+        setStatus('No video media found on this page.');
         return;
     }
 
-    videoCandidates = mediaUrls;
-    select.innerHTML = '';
+    const options = mediaUrls
+        .map((url, i) => `${i + 1}. ${url}`)
+        .join('\n');
 
-    mediaUrls.forEach((url, i) => {
-        const option = document.createElement('option');
-        option.value = String(i);
-        option.textContent = `${i + 1}. ${url}`;
-        select.appendChild(option);
-    });
+    const selection = prompt(`Select video to download:
 
-    picker.style.display = 'block';
-    setStatus('Choose a video then click Download Selected Video.', 3000);
-}
+${options}
 
-function startVideoDownload(selectedUrl) {
+Enter number:`);
+    const selectionNumber = Number(selection);
+
+    if (!selection || Number.isNaN(selectionNumber) || selectionNumber < 1 || selectionNumber > mediaUrls.length) {
+        setStatus('Download cancelled.');
+        return;
+    }
+
+    const selectedUrl = mediaUrls[selectionNumber - 1];
     chrome.downloads.download({
         url: selectedUrl,
         conflictAction: 'uniquify'
@@ -171,24 +160,7 @@ function startVideoDownload(selectedUrl) {
             return;
         }
         setStatus('Video download started.', 3000);
-        resetVideoPicker();
     });
-}
-
-async function chooseAndDownloadVideo() {
-    const mediaUrls = await fetchVideoSourcesFromActiveTab();
-    if (!mediaUrls.length) {
-        setStatus('No video media found on this page.');
-        resetVideoPicker();
-        return;
-    }
-
-    if (mediaUrls.length === 1) {
-        startVideoDownload(mediaUrls[0]);
-        return;
-    }
-
-    showVideoPicker(mediaUrls);
 }
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== currentDomain) {
@@ -203,8 +175,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exportBtn = document.getElementById('exportBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
     const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-    const confirmVideoDownloadBtn = document.getElementById('confirmVideoDownloadBtn');
-    const cancelVideoDownloadBtn = document.getElementById('cancelVideoDownloadBtn');
     const tab = await queryActiveTab();
     if (tab && tab.url) {
         refreshDomain(getBaseDomain(new URL(tab.url).hostname));
@@ -216,22 +186,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshBtn.addEventListener('click', refreshList);
     if (downloadVideoBtn) {
         downloadVideoBtn.addEventListener('click', chooseAndDownloadVideo);
-    }
-    if (confirmVideoDownloadBtn) {
-        confirmVideoDownloadBtn.addEventListener('click', () => {
-            const selectedIndex = Number(document.getElementById('videoSelect')?.value);
-            if (Number.isNaN(selectedIndex) || !videoCandidates[selectedIndex]) {
-                setStatus('Please select a video to download.');
-                return;
-            }
-            startVideoDownload(videoCandidates[selectedIndex]);
-        });
-    }
-    if (cancelVideoDownloadBtn) {
-        cancelVideoDownloadBtn.addEventListener('click', () => {
-            resetVideoPicker();
-            setStatus('Download cancelled.');
-        });
     }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
