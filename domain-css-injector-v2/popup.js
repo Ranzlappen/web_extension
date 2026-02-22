@@ -2,6 +2,28 @@ let currentDomain = null;
 let englishVoice;
 let videoCandidates = [];
 
+function normalizeMediaUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return null;
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return null;
+    try {
+        return new URL(trimmed, window.location.href).href;
+    } catch (_) {
+        return null;
+    }
+}
+
+function isLikelyMediaUrl(url) {
+    return /\.(mp4|webm|m4v|mov|m3u8|mpd|mkv|avi|flv|wmv)(\?|#|$)/i.test(url);
+}
+
+function getMediaLabel(candidate, index) {
+    const source = candidate.source || 'unknown';
+    const quality = candidate.qualityLabel ? ` (${candidate.qualityLabel})` : '';
+    const fileHint = candidate.filenameHint ? ` [${candidate.filenameHint}]` : '';
+    return `${index + 1}. ${source}${quality}${fileHint}\n${candidate.url}`;
+}
+
 speechSynthesis.onvoiceschanged = () => {
   const voices = speechSynthesis.getVoices();
   englishVoice =
@@ -104,38 +126,114 @@ async function fetchVideoSourcesFromActiveTab() {
 
     const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
+        allFrames: true,
         func: () => {
-            const urls = new Set();
-            const videos = Array.from(document.querySelectorAll('video'));
+            const candidates = [];
+            const seen = new Set();
 
-            videos.forEach((video) => {
-                if (video.currentSrc) urls.add(video.currentSrc);
-                if (video.src) urls.add(video.src);
+            function addCandidate(url, source, extra = {}) {
+                if (!url || typeof url !== 'string') return;
+                const trimmed = url.trim();
+                if (!trimmed) return;
+                if (seen.has(trimmed)) return;
+                seen.add(trimmed);
+                candidates.push({
+                    url: trimmed,
+                    source,
+                    ...extra
+                });
+            }
+
+            const videos = Array.from(document.querySelectorAll('video'));
+            videos.forEach((video, index) => {
+                addCandidate(video.currentSrc, 'video.currentSrc', {
+                    muted: video.muted,
+                    title: video.title || document.title || '',
+                    index
+                });
+                addCandidate(video.src, 'video.src', {
+                    muted: video.muted,
+                    title: video.title || document.title || '',
+                    index
+                });
                 Array.from(video.querySelectorAll('source')).forEach((source) => {
-                    if (source.src) urls.add(source.src);
+                    addCandidate(source.src, 'video source tag', {
+                        type: source.type || ''
+                    });
                 });
             });
 
-            return Array.from(urls).filter(Boolean);
+            const links = Array.from(document.querySelectorAll('a[href]'));
+            links.forEach((a) => {
+                const href = a.getAttribute('href') || '';
+                if (/\.(mp4|webm|m4v|mov|m3u8|mpd)(\?|#|$)/i.test(href)) {
+                    addCandidate(a.href, 'media link', {
+                        filenameHint: (a.textContent || '').trim().slice(0, 80)
+                    });
+                }
+            });
+
+            const perf = performance.getEntriesByType
+                ? performance.getEntriesByType('resource')
+                : [];
+            perf.forEach((entry) => {
+                if (entry && entry.name && /\.(mp4|webm|m4v|mov|m3u8|mpd)(\?|#|$)/i.test(entry.name)) {
+                    addCandidate(entry.name, 'network resource', {
+                        initiatorType: entry.initiatorType || ''
+                    });
+                }
+            });
+
+            if (window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.streamingData) {
+                const { formats = [], adaptiveFormats = [] } = window.ytInitialPlayerResponse.streamingData;
+                [...formats, ...adaptiveFormats].forEach((fmt) => {
+                    addCandidate(fmt.url, 'YouTube stream', {
+                        qualityLabel: fmt.qualityLabel || '',
+                        mimeType: fmt.mimeType || ''
+                    });
+                });
+            }
+
+            return candidates;
         }
     });
 
-    const mediaUrls = results && results[0] && Array.isArray(results[0].result)
-        ? results[0].result
-        : [];
+    const merged = [];
+    const dedup = new Set();
+    (results || []).forEach((frameResult) => {
+        const frameCandidates = Array.isArray(frameResult?.result) ? frameResult.result : [];
+        frameCandidates.forEach((candidate) => {
+            const normalizedUrl = normalizeMediaUrl(candidate?.url);
+            if (!normalizedUrl || dedup.has(normalizedUrl)) return;
+            dedup.add(normalizedUrl);
+            merged.push({
+                ...candidate,
+                url: normalizedUrl,
+                downloadable: !normalizedUrl.startsWith('blob:'),
+                likelyMediaFile: isLikelyMediaUrl(normalizedUrl)
+            });
+        });
+    });
 
-    return mediaUrls;
+    merged.sort((a, b) => {
+        if (a.downloadable !== b.downloadable) return a.downloadable ? -1 : 1;
+        if (a.likelyMediaFile !== b.likelyMediaFile) return a.likelyMediaFile ? -1 : 1;
+        return a.url.length - b.url.length;
+    });
+
+    return merged;
 }
 
 async function chooseAndDownloadVideo() {
     const mediaUrls = await fetchVideoSourcesFromActiveTab();
+    videoCandidates = mediaUrls;
     if (!mediaUrls.length) {
         setStatus('No video media found on this page.');
         return;
     }
 
     const options = mediaUrls
-        .map((url, i) => `${i + 1}. ${url}`)
+        .map((candidate, i) => getMediaLabel(candidate, i))
         .join('\n');
 
     const selection = prompt(`Select video to download:
@@ -150,7 +248,13 @@ Enter number:`);
         return;
     }
 
-    const selectedUrl = mediaUrls[selectionNumber - 1];
+    const selected = mediaUrls[selectionNumber - 1];
+    if (!selected.downloadable) {
+        setStatus('Selected media is a blob stream and cannot be downloaded directly.', 3500);
+        return;
+    }
+
+    const selectedUrl = selected.url;
     chrome.downloads.download({
         url: selectedUrl,
         conflictAction: 'uniquify'
