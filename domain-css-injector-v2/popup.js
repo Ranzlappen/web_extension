@@ -1,5 +1,6 @@
 let currentDomain = null;
 let englishVoice;
+let videoCandidates = [];
 
 speechSynthesis.onvoiceschanged = () => {
   const voices = speechSynthesis.getVoices();
