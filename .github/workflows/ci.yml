@@ -1,0 +1,56 @@
+# Lightweight validation for the unpacked extension. No build step exists;
+# this workflow just confirms the extension is still loadable: manifest is
+# valid JSON, JS files parse, and every icon referenced in the manifest
+# actually exists on disk.
+#
+# Required secrets: none.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "domain-css-injector-v2/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "domain-css-injector-v2/**"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-extension:
+    name: Validate extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate manifest.json is valid JSON
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('domain-css-injector-v2/manifest.json', 'utf8'))"
+
+      - name: Syntax-check JavaScript sources
+        run: |
+          set -e
+          for f in domain-css-injector-v2/*.js; do
+            echo "node --check $f"
+            node --check "$f"
+          done
+
+      - name: Confirm icons referenced by manifest exist
+        run: |
+          set -e
+          for size in 16 48 128; do
+            test -f "domain-css-injector-v2/icons/icon${size}.png" \
+              || { echo "Missing icon: icons/icon${size}.png"; exit 1; }
+          done

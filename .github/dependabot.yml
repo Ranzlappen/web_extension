@@ -1,0 +1,15 @@
+# Weekly dependency updates. The extension itself has no runtime dependencies,
+# so the only ecosystem in scope is the GitHub Actions used by CI.
+# Minor + patch are grouped into a single PR to reduce noise; majors get their
+# own PR so they get scrutinized individually.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

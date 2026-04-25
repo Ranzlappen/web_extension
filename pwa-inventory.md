@@ -1,0 +1,125 @@
+# Storage & Manifest Inventory
+
+This repo is **not** a Progressive Web App — it is a Manifest V3 browser extension. There is no `sw.js`, no web-app `manifest.webmanifest`, no `.well-known/assetlinks.json`, and no TWA binding. However, it has installed users with persisted data (`chrome.storage.local`) and a `manifest.json` whose contract — installed-icon assets, popup entry, content-script match patterns — is identical in spirit to the PWA Refactor Addendum's "installed users have data and an app shell" guarantee.
+
+This inventory captures every key, path, and identifier whose value is part of the extension's external contract. **Every value below is sacred** and must round-trip identically through any refactor.
+
+---
+
+## 1. Storage keys
+
+`chrome.storage.local` is the only persistent store. Keys are dynamic — one per saved domain — and computed by `getBaseDomain(hostname)` (last two labels of the hostname).
+
+| Key shape | Source of value | Type | Notes |
+| --- | --- | --- | --- |
+| `<base-domain>` (e.g. `example.com`) | `getBaseDomain(window.location.hostname)` in `popup.js:33-36` and `content.js:1-5` | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
+
+Read sites:
+
+* `popup.js:49` — `chrome.storage.local.get([domain], …)` to load the editor for a domain
+* `popup.js:111` — `chrome.storage.local.get(null, renderList)` to populate the saved-snippets list
+* `popup.js:295` — `chrome.storage.local.get(null, …)` for **Export JSON**
+* `content.js:9` — `chrome.storage.local.get([domain], …)` to inject CSS at `document_start`
+* `content.js:17` — `chrome.storage.onChanged` listener for live updates
+
+Write sites:
+
+* `popup.js:77` — `chrome.storage.local.set({ [currentDomain]: css }, …)` on **Save**
+* `popup.js:84` — `chrome.storage.local.remove([currentDomain], …)` on **Delete**
+
+## 2. Schema versions
+
+None. There is no migration pipeline, no `schemaVersion` constant, and no version key in `chrome.storage`. The data shape has been a flat `domain → cssString` map for the entire lifetime of the extension. Any future change that introduces structure (e.g. wrapping the value in an object) **must** ship behind an explicit migration.
+
+## 3. Service worker
+
+The extension has **no** service worker (MV3 background service worker is not declared in the manifest, and the project ships no `sw.js` / `service-worker.js`). The on-page code is a content script registered at `document_start`:
+
+```jsonc
+// manifest.json
+"content_scripts": [
+  {
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_start"
+  }
+]
+```
+
+If a background service worker is ever added, this section needs updating with file path, registration, and `chrome.runtime` event subscriptions.
+
+## 4. Manifest paths
+
+Every path-shaped value in `domain-css-injector-v2/manifest.json` and the file it resolves to:
+
+| Manifest field | Value | Resolves to |
+| --- | --- | --- |
+| `icons["16"]` | `icons/icon16.png` | `domain-css-injector-v2/icons/icon16.png` ✓ |
+| `icons["48"]` | `icons/icon48.png` | `domain-css-injector-v2/icons/icon48.png` ✓ |
+| `icons["128"]` | `icons/icon128.png` | `domain-css-injector-v2/icons/icon128.png` ✓ |
+| `action.default_popup` | `popup.html` | `domain-css-injector-v2/popup.html` ✓ |
+| `action.default_icon["16"]` | `icons/icon16.png` | ✓ |
+| `action.default_icon["48"]` | `icons/icon48.png` | ✓ |
+| `action.default_icon["128"]` | `icons/icon128.png` | ✓ |
+| `sidebar_action.default_panel` | `popup.html` | `domain-css-injector-v2/popup.html` ✓ |
+| `sidebar_action.default_icon["16"]` | `icons/icon16.png` | ✓ |
+| `sidebar_action.default_icon["48"]` | `icons/icon48.png` | ✓ |
+| `sidebar_action.default_icon["128"]` | `icons/icon128.png` | ✓ |
+| `content_scripts[0].js[0]` | `content.js` | `domain-css-injector-v2/content.js` ✓ |
+
+`name`, `version`, `description`, and the permissions list are part of the same contract — changing `name` will rename the entry on every installed user's toolbar / sidebar; changing `version` is required for any update; changing the permissions set requires re-prompting the user. None of those are touched by this elevation pass.
+
+## 5. TWA binding
+
+None. There is no `.well-known/assetlinks.json`, no Android Trusted Web Activity, no Play Store binding.
+
+## 6. Permissions requested
+
+Declared in `manifest.json` (granted at install time):
+
+* `storage` — for `chrome.storage.local` reads/writes
+* `activeTab` — to read the active tab's URL when the popup opens
+* `scripting` — to run the video-source scanner via `chrome.scripting.executeScript`
+* `tabs` — to query / message the active tab from the popup
+* `clipboardWrite` — used by the inspect-element overlay to copy a selector
+* `downloads` — to hand a media URL to `chrome.downloads.download`
+
+Host permission: `<all_urls>` (required because the extension targets any site the user wants to style).
+
+Runtime gestures:
+
+* Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** button click in `popup.js:322-347`
+* `navigator.clipboard.writeText` — gated on a click within the page during inspect mode (`content.js:104`)
+* `chrome.downloads.download` — gated on the **Download Video Media** button click (`popup.js:258`)
+
+These gestures must stay attached to their current click handlers; moving them to module-load time will silently break the feature.
+
+## 7. External dependencies
+
+None. No CDN scripts, no remote imports, no `<script src="https://…">` tags. Every byte the extension runs ships in this repo.
+
+## 8. UI entry surfaces
+
+Two surfaces, one HTML file:
+
+* `action.default_popup` → `popup.html` — the toolbar popup on Chrome / Edge
+* `sidebar_action.default_panel` → `popup.html` — the sidebar panel on Opera / Firefox
+
+Both surfaces must continue to render `popup.html` correctly. The styles in `popup.html` are intentionally width-agnostic so the same file works as a fixed Chrome popup and as a flexible Opera sidebar.
+
+---
+
+## Verification
+
+After this elevation PR, walk the inventory:
+
+* [✓] Every storage key still computed from the same `getBaseDomain(hostname)` — no rename, no schema change.
+* [✓] Schema version: still none. No migration pipeline added.
+* [✓] No service worker added or removed. Content-script entry unchanged (`content.js` at `document_start`, `<all_urls>`).
+* [✓] Every manifest path still resolves to an existing file in `domain-css-injector-v2/`.
+* [✓] No TWA / `assetlinks.json` involved.
+* [✓] Permission set unchanged. Click-gesture bindings unchanged.
+* [✓] No external CDN dependencies introduced.
+* [✓] `popup.html` still renders on both `action` (new in this PR) and `sidebar_action` (unchanged).
+
+If any line above is not ✓, the PR is not ready.
