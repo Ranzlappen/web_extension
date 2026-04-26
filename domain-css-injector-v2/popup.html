@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>CSS Injector</title>
+    <title>Pageside</title>
     <style>
         :root{color-scheme:dark;}
         body{font-family: sans-serif;min-width:320px;max-width:100%;font-size: 20px;box-sizing:border-box;background-color: #0f121c;color:#e6e8ef;margin:0;padding:12px;}
@@ -25,22 +25,22 @@
 </head>
 
 <body>
-        <h3>CSS Injector</h3>
-        <div id="domainInfo">Detecting domain…</div>
+        <h3>Pageside</h3>
+        <div id="domainInfo">Detecting site…</div>
         <div class="hint">Enter custom CSS below</div>
-        <textarea id="cssInput" placeholder="Enter custom CSS for this domain
+        <textarea id="cssInput" placeholder="Enter custom CSS for this site
 
 .class  {style:example;}
 #id     {style:example;}
 body    {style:example;}
 *       {style:example;}"></textarea>
         <div class="controls">
-            <button id="saveBtn">Save CSS changes</button>
-            <button id="deleteBtn">Delete CSS for this Page</button>
+            <button id="saveBtn">Save Style Changes</button>
+            <button id="deleteBtn">Delete Style for this Page</button>
 			<button id="inspectBtn">Select Container</button>
         </div>
         <div id="status"></div>
-		<h4>TTS Reader</h4>
+		<h4>Read Aloud</h4>
 		<div class="controls">
 			<button id="readTextBtn">Read Selected Text</button>
 			<button id="stopReadBtn">Stop Reading</button>
@@ -49,6 +49,7 @@ body    {style:example;}
 		<div class="controls">
 			<button id="downloadVideoBtn">Download Video Media</button>
 		</div>
+		<div class="hint">Tip: right-click any video on the page and choose "Download this video".</div>
         <h4>Saved snippets</h4>
         <div class="controls">
             <button id="refreshBtn">Refresh list</button>

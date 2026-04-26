@@ -1,0 +1,95 @@
+# Production release builds for the unpacked extension. Packages
+# domain-css-injector-v2/ into a distributable .zip and attaches it to a
+# GitHub Release. There is no build step for the extension itself — this
+# workflow only validates and zips the source folder as it ships.
+#
+# Triggers:
+#   * tag push  matching v*  -> builds and creates / updates the release
+#   * workflow_dispatch       -> on-demand zip available as a workflow artifact
+#
+# Required secrets: none (uses GITHUB_TOKEN for releases).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package-extension:
+    name: Package extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate manifest.json is valid JSON
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('domain-css-injector-v2/manifest.json', 'utf8'))"
+
+      - name: Syntax-check JavaScript sources
+        run: |
+          set -e
+          for f in domain-css-injector-v2/*.js; do
+            echo "node --check $f"
+            node --check "$f"
+          done
+
+      - name: Confirm icons referenced by manifest exist
+        run: |
+          set -e
+          for size in 16 48 128; do
+            test -f "domain-css-injector-v2/icons/icon${size}.png" \
+              || { echo "Missing icon: icons/icon${size}.png"; exit 1; }
+          done
+
+      - name: Read manifest version
+        id: meta
+        run: |
+          set -e
+          VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('domain-css-injector-v2/manifest.json', 'utf8')).version)")
+          NAME=$(node -e "console.log(JSON.parse(require('fs').readFileSync('domain-css-injector-v2/manifest.json', 'utf8')).name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-\$/g,''))")
+          REF_TAG="${GITHUB_REF_NAME:-manual}"
+          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
+          echo "name=$NAME"         >> "$GITHUB_OUTPUT"
+          echo "tag=$REF_TAG"       >> "$GITHUB_OUTPUT"
+
+      - name: Build production zip
+        id: build
+        run: |
+          set -e
+          OUT="${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip"
+          mkdir -p dist
+          (cd domain-css-injector-v2 && zip -r "../dist/$OUT" . -x "*.DS_Store" "Thumbs.db")
+          echo "artifact=dist/$OUT" >> "$GITHUB_OUTPUT"
+          ls -la dist/
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
+          path: ${{ steps.build.outputs.artifact }}
+          if-no-files-found: error
+
+      - name: Create / update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          files: ${{ steps.build.outputs.artifact }}
+          generate_release_notes: true

@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "CSS Injector",
+  "name": "Pageside",
   "version": "1.0",
-  "description": "Inject custom CSS per domain, with a sidebar editor and manager.",
+  "description": "Per-site style helper with element picker, text reader, and media saver.",
   "permissions": [
     "storage",
     "activeTab",
     "scripting",
     "tabs",
     "clipboardWrite",
-    "downloads"
+    "downloads",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -21,7 +22,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CSS Injector",
+    "default_title": "Pageside",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -35,6 +36,9 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

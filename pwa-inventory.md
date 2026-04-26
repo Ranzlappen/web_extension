@@ -12,7 +12,7 @@ This inventory captures every key, path, and identifier whose value is part of t
 
 | Key shape | Source of value | Type | Notes |
 | --- | --- | --- | --- |
-| `<base-domain>` (e.g. `example.com`) | `getBaseDomain(window.location.hostname)` in `popup.js:33-36` and `content.js:1-5` | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
+| `<base-domain>` (e.g. `example.com`) | `resolveBaseHost(window.location.hostname)` in `popup.js` and `content.js` (renamed from `getBaseDomain` in the obfuscation pass — same algorithm) | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
 
 Read sites:
 
@@ -33,7 +33,22 @@ None. There is no migration pipeline, no `schemaVersion` constant, and no versio
 
 ## 3. Service worker
 
-The extension has **no** service worker (MV3 background service worker is not declared in the manifest, and the project ships no `sw.js` / `service-worker.js`). The on-page code is a content script registered at `document_start`:
+The extension ships a single MV3 background service worker at `domain-css-injector-v2/background.js`, declared in the manifest as:
+
+```jsonc
+// manifest.json
+"background": {
+  "service_worker": "background.js"
+}
+```
+
+It subscribes to:
+
+* `chrome.runtime.onInstalled` — registers the `chrome.contextMenus` entry once at install.
+* `chrome.runtime.onStartup` — re-registers the same entry per session (defensive — `onInstalled` only fires on install / update).
+* `chrome.contextMenus.onClicked` — when the user picks **Download this video** on a `<video>` element, it forwards `info.srcUrl` to `chrome.downloads.download` with `conflictAction: 'uniquify'` (skipping `blob:` URLs, mirroring popup-side behavior).
+
+The on-page code is still a content script registered at `document_start`:
 
 ```jsonc
 // manifest.json
@@ -46,7 +61,7 @@ The extension has **no** service worker (MV3 background service worker is not de
 ]
 ```
 
-If a background service worker is ever added, this section needs updating with file path, registration, and `chrome.runtime` event subscriptions.
+The injected `<style>` element id is `__ps_kx9w4_style` (deliberately neutral / randomized so anti-extension scripts cannot fingerprint it). Round-trip the same id in `content.js` if it is ever changed.
 
 ## 4. Manifest paths
 
@@ -66,8 +81,9 @@ Every path-shaped value in `domain-css-injector-v2/manifest.json` and the file i
 | `sidebar_action.default_icon["48"]` | `icons/icon48.png` | ✓ |
 | `sidebar_action.default_icon["128"]` | `icons/icon128.png` | ✓ |
 | `content_scripts[0].js[0]` | `content.js` | `domain-css-injector-v2/content.js` ✓ |
+| `background.service_worker` | `background.js` | `domain-css-injector-v2/background.js` ✓ |
 
-`name`, `version`, `description`, and the permissions list are part of the same contract — changing `name` will rename the entry on every installed user's toolbar / sidebar; changing `version` is required for any update; changing the permissions set requires re-prompting the user. None of those are touched by this elevation pass.
+`name`, `version`, `description`, and the permissions list are part of the same contract — changing `name` will rename the entry on every installed user's toolbar / sidebar; changing `version` is required for any update; changing the permissions set requires re-prompting the user. The current obfuscation pass renamed `name` to `Pageside` (intentionally neutral) and added the `contextMenus` permission to back the right-click "Download this video" entry; both are intentional and documented.
 
 ## 5. TWA binding
 
@@ -83,14 +99,15 @@ Declared in `manifest.json` (granted at install time):
 * `tabs` — to query / message the active tab from the popup
 * `clipboardWrite` — used by the inspect-element overlay to copy a selector
 * `downloads` — to hand a media URL to `chrome.downloads.download`
+* `contextMenus` — used by `background.js` to register the right-click **Download this video** entry on `<video>` elements
 
 Host permission: `<all_urls>` (required because the extension targets any site the user wants to style).
 
 Runtime gestures:
 
-* Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** button click in `popup.js:322-347`
-* `navigator.clipboard.writeText` — gated on a click within the page during inspect mode (`content.js:104`)
-* `chrome.downloads.download` — gated on the **Download Video Media** button click (`popup.js:258`)
+* Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** button click in `popup.js`
+* `navigator.clipboard.writeText` — gated on a click within the page during picker mode (`content.js`, in `onPickerSelect`)
+* `chrome.downloads.download` — gated on either the popup's **Download Video Media** button click (`popup.js`, in `pickAndSaveMedia`) or the right-click context-menu **Download this video** entry handled by `background.js`
 
 These gestures must stay attached to their current click handlers; moving them to module-load time will silently break the feature.
 
@@ -113,13 +130,13 @@ Both surfaces must continue to render `popup.html` correctly. The styles in `pop
 
 After this elevation PR, walk the inventory:
 
-* [✓] Every storage key still computed from the same `getBaseDomain(hostname)` — no rename, no schema change.
+* [✓] Every storage key still computed from the same algorithm — function renamed (`getBaseDomain` → `resolveBaseHost`) but the per-domain key shape and the last-two-labels rule are unchanged. No schema change.
 * [✓] Schema version: still none. No migration pipeline added.
-* [✓] No service worker added or removed. Content-script entry unchanged (`content.js` at `document_start`, `<all_urls>`).
+* [✓] Service worker added (`background.js`) for the right-click **Download this video** entry only. Content-script entry unchanged (`content.js` at `document_start`, `<all_urls>`).
 * [✓] Every manifest path still resolves to an existing file in `domain-css-injector-v2/`.
 * [✓] No TWA / `assetlinks.json` involved.
-* [✓] Permission set unchanged. Click-gesture bindings unchanged.
+* [✓] Permission set extended by `contextMenus` only (documented above). Click-gesture bindings unchanged for the popup-driven flows; new gesture is the native context-menu click handled by `background.js`.
 * [✓] No external CDN dependencies introduced.
-* [✓] `popup.html` still renders on both `action` (new in this PR) and `sidebar_action` (unchanged).
+* [✓] `popup.html` still renders on both `action` and `sidebar_action`.
 
 If any line above is not ✓, the PR is not ready.

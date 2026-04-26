@@ -1,8 +1,8 @@
-let currentDomain = null;
-let englishVoice;
-let videoCandidates = [];
+let activeHost = null;
+let ttsVoice;
+let mediaCandidates = [];
 
-function normalizeMediaUrl(rawUrl) {
+function normalizeUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return null;
     const trimmed = rawUrl.trim();
     if (!trimmed) return null;
@@ -13,11 +13,11 @@ function normalizeMediaUrl(rawUrl) {
     }
 }
 
-function isLikelyMediaUrl(url) {
+function looksLikeMedia(url) {
     return /\.(mp4|webm|m4v|mov|m3u8|mpd|mkv|avi|flv|wmv)(\?|#|$)/i.test(url);
 }
 
-function getMediaLabel(candidate, index) {
+function formatCandidate(candidate, index) {
     const source = candidate.source || 'unknown';
     const quality = candidate.qualityLabel ? ` (${candidate.qualityLabel})` : '';
     const fileHint = candidate.filenameHint ? ` [${candidate.filenameHint}]` : '';
@@ -26,32 +26,32 @@ function getMediaLabel(candidate, index) {
 
 speechSynthesis.onvoiceschanged = () => {
   const voices = speechSynthesis.getVoices();
-  englishVoice =
+  ttsVoice =
     voices.find(v => v.name.includes('Google US English')) ||
     voices.find(v => v.lang === 'en-US');
 };
-function getBaseDomain(hostname) {
+function resolveBaseHost(hostname) {
     const parts = hostname.split('.').reverse();
     return parts.length > 2 ? `${parts[1]}.${parts[0]}` : hostname;
 }
-async function queryActiveTab() {
+async function getActiveTab() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     return tabs && tabs[0];
 }
-function setStatus(text, timeout = 2000) {
+function showStatus(text, timeout = 2000) {
     const statusEl = document.getElementById('status');
     statusEl.textContent = text;
     if (timeout) setTimeout(() => (statusEl.textContent = ''), timeout);
 }
-function refreshDomain(domain) {
-    currentDomain = domain;
-    document.getElementById('domainInfo').textContent = `Detected domain: ${domain}`;
-    chrome.storage.local.get([domain], (res) => {
-        document.getElementById('cssInput').value = res[domain] || '';
+function loadHost(host) {
+    activeHost = host;
+    document.getElementById('domainInfo').textContent = `Detected site: ${host}`;
+    chrome.storage.local.get([host], (res) => {
+        document.getElementById('cssInput').value = res[host] || '';
     });
-    refreshList();
+    reloadSnippets();
 }
-function isValidCSS(css) {
+function validateCss(css) {
     css = css.replace(/\/\*[\s\S]*?\*\//g, '').trim();
     const blockRegex = /[^\{\}]+\{[^\{\}]*\}/;
     if (!blockRegex.test(css)) {
@@ -68,26 +68,26 @@ function isValidCSS(css) {
     }
     return true;
 }
-function saveCSS(css) {
-    if (!currentDomain) return;
-    if (!isValidCSS(css)) {
-        setStatus('CSS is invalid, not saved.');
+function persistCss(css) {
+    if (!activeHost) return;
+    if (!validateCss(css)) {
+        showStatus('Style is invalid, not saved.');
         return;
     }
-    chrome.storage.local.set({ [currentDomain]: css }, () => {
-        setStatus('Saved!');
-        refreshList();
+    chrome.storage.local.set({ [activeHost]: css }, () => {
+        showStatus('Saved!');
+        reloadSnippets();
     });
 }
-function deleteCSS() {
-    if (!currentDomain) return;
-    chrome.storage.local.remove([currentDomain], () => {
+function dropCss() {
+    if (!activeHost) return;
+    chrome.storage.local.remove([activeHost], () => {
         document.getElementById('cssInput').value = '';
-        setStatus('Deleted for this domain.');
-        refreshList();
+        showStatus('Deleted for this site.');
+        reloadSnippets();
     });
 }
-function renderList(items) {
+function renderSnippets(items) {
     const list = document.getElementById('list');
     list.innerHTML = '';
     const keys = Object.keys(items).sort();
@@ -102,25 +102,25 @@ function renderList(items) {
         div.innerHTML = `<strong>${k}</strong><div class="small">${preview}</div>`;
         div.addEventListener('click', () => {
             document.getElementById('cssInput').value = items[k];
-            setStatus(`Loaded ${k} into editor`, 1500);
+            showStatus(`Loaded ${k} into editor`, 1500);
         });
         list.appendChild(div);
     });
 }
-function refreshList() {
-    chrome.storage.local.get(null, renderList);
+function reloadSnippets() {
+    chrome.storage.local.get(null, renderSnippets);
 }
-async function updateActiveTab() {
-    const tab = await queryActiveTab();
+async function pollActiveTab() {
+    const tab = await getActiveTab();
     if (!tab || !tab.url) return;
-    const domain = getBaseDomain(new URL(tab.url).hostname);
-    if (domain !== currentDomain) refreshDomain(domain);
+    const host = resolveBaseHost(new URL(tab.url).hostname);
+    if (host !== activeHost) loadHost(host);
 }
 
-async function fetchVideoSourcesFromActiveTab() {
-    const tab = await queryActiveTab();
+async function collectMediaSources() {
+    const tab = await getActiveTab();
     if (!tab || !tab.id) {
-        setStatus('No active tab detected.');
+        showStatus('No active tab detected.');
         return [];
     }
 
@@ -203,14 +203,14 @@ async function fetchVideoSourcesFromActiveTab() {
     (results || []).forEach((frameResult) => {
         const frameCandidates = Array.isArray(frameResult?.result) ? frameResult.result : [];
         frameCandidates.forEach((candidate) => {
-            const normalizedUrl = normalizeMediaUrl(candidate?.url);
+            const normalizedUrl = normalizeUrl(candidate?.url);
             if (!normalizedUrl || dedup.has(normalizedUrl)) return;
             dedup.add(normalizedUrl);
             merged.push({
                 ...candidate,
                 url: normalizedUrl,
                 downloadable: !normalizedUrl.startsWith('blob:'),
-                likelyMediaFile: isLikelyMediaUrl(normalizedUrl)
+                likelyMediaFile: looksLikeMedia(normalizedUrl)
             });
         });
     });
@@ -224,16 +224,16 @@ async function fetchVideoSourcesFromActiveTab() {
     return merged;
 }
 
-async function chooseAndDownloadVideo() {
-    const mediaUrls = await fetchVideoSourcesFromActiveTab();
-    videoCandidates = mediaUrls;
+async function pickAndSaveMedia() {
+    const mediaUrls = await collectMediaSources();
+    mediaCandidates = mediaUrls;
     if (!mediaUrls.length) {
-        setStatus('No video media found on this page.');
+        showStatus('No video media found on this page.');
         return;
     }
 
     const options = mediaUrls
-        .map((candidate, i) => getMediaLabel(candidate, i))
+        .map((candidate, i) => formatCandidate(candidate, i))
         .join('\n');
 
     const selection = prompt(`Select video to download:
@@ -244,13 +244,13 @@ Enter number:`);
     const selectionNumber = Number(selection);
 
     if (!selection || Number.isNaN(selectionNumber) || selectionNumber < 1 || selectionNumber > mediaUrls.length) {
-        setStatus('Download cancelled.');
+        showStatus('Download cancelled.');
         return;
     }
 
     const selected = mediaUrls[selectionNumber - 1];
     if (!selected.downloadable) {
-        setStatus('Selected media is a blob stream and cannot be downloaded directly.', 3500);
+        showStatus('Selected media is a blob stream and cannot be downloaded directly.', 3500);
         return;
     }
 
@@ -260,15 +260,15 @@ Enter number:`);
         conflictAction: 'uniquify'
     }, (downloadId) => {
         if (chrome.runtime.lastError || !downloadId) {
-            setStatus(`Download failed: ${chrome.runtime.lastError?.message || 'Unknown error'}`, 3000);
+            showStatus(`Download failed: ${chrome.runtime.lastError?.message || 'Unknown error'}`, 3000);
             return;
         }
-        setStatus('Video download started.', 3000);
+        showStatus('Video download started.', 3000);
     });
 }
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== currentDomain) {
-        refreshDomain(msg.domain);
+    if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== activeHost) {
+        loadHost(msg.domain);
     }
 });
 document.addEventListener('DOMContentLoaded', async () => {
@@ -279,17 +279,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exportBtn = document.getElementById('exportBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
     const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-    const tab = await queryActiveTab();
+    const tab = await getActiveTab();
     if (tab && tab.url) {
-        refreshDomain(getBaseDomain(new URL(tab.url).hostname));
+        loadHost(resolveBaseHost(new URL(tab.url).hostname));
     } else {
         document.getElementById('domainInfo').textContent = 'No active tab detected.';
     }
-    saveBtn.addEventListener('click', () => saveCSS(cssInput.value));
-    deleteBtn.addEventListener('click', deleteCSS);
-    refreshBtn.addEventListener('click', refreshList);
+    saveBtn.addEventListener('click', () => persistCss(cssInput.value));
+    deleteBtn.addEventListener('click', dropCss);
+    refreshBtn.addEventListener('click', reloadSnippets);
     if (downloadVideoBtn) {
-        downloadVideoBtn.addEventListener('click', chooseAndDownloadVideo);
+        downloadVideoBtn.addEventListener('click', pickAndSaveMedia);
     }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
@@ -298,13 +298,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'domain-css-snippets.json';
+            a.download = 'pageside-snippets.json';
             a.click();
             URL.revokeObjectURL(url);
-            setStatus('Exported JSON.');
+            showStatus('Exported JSON.');
         });
     });
-    refreshList();
+    reloadSnippets();
 });
 document.addEventListener('DOMContentLoaded', () => {
   const inspectBtn = document.getElementById('inspectBtn');
@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     inspectBtn.addEventListener('click', () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'START_INSPECT' });
+          chrome.tabs.sendMessage(tabs[0].id, { type: 'PS_START_PICK' });
         }
       });
     });
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Speak the selected text
                 const utterance = new SpeechSynthesisUtterance(selectedText);
 				utterance.lang = 'en-US';
-				if (englishVoice) utterance.voice = englishVoice;
+				if (ttsVoice) utterance.voice = ttsVoice;
 				speechSynthesis.speak(utterance);
               } else {
                 alert('No text selected on the page.');
@@ -353,4 +353,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-setInterval(updateActiveTab, 500);
+setInterval(pollActiveTab, 500);

@@ -6,7 +6,7 @@ Per-domain CSS injection plus a small toolbox (selector inspector, TTS reader, v
 
 Single-module Chromium / Firefox browser extension. No bundler, no build step, no backend. The extension is loaded directly from the `domain-css-injector-v2/` folder and persists everything to `chrome.storage.local`.
 
-* **CSS Injector** (`domain-css-injector-v2/`) — Manifest V3 extension. `popup.html` is the editor UI, served as the toolbar popup on Chrome / Edge (`action`) and as the sidebar panel on Opera / Firefox (`sidebar_action`). `content.js` runs at `document_start` on every URL, reads the saved CSS for the page's base domain, and injects a `<style>` element. `popup.js` drives the editor, the inspect-element overlay, the Web-Speech TTS, and the `chrome.downloads` video pipeline.
+* **Pageside** (`domain-css-injector-v2/`) — Manifest V3 extension. `popup.html` is the editor UI, served as the toolbar popup on Chrome / Edge (`action`) and as the sidebar panel on Opera / Firefox (`sidebar_action`). `content.js` runs at `document_start` on every URL, reads the saved CSS for the page's base domain, and injects a `<style id="__ps_kx9w4_style">` element. `popup.js` drives the editor, the inspect-element overlay, the Web-Speech TTS, and the popup-driven `chrome.downloads` video pipeline. `background.js` is the MV3 service worker — it registers the `chrome.contextMenus` "Download this video" entry against `<video>` elements and routes the click into `chrome.downloads`. The user-facing extension name is intentionally a generic value so detection scripts that fingerprint by extension name don't trip; the directory and storage-key contract are unchanged.
 
 ## Build & Development
 
@@ -24,10 +24,11 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 
 ## Key Conventions
 
-* **Storage keys are domain strings.** Each saved snippet lives under `chrome.storage.local[<base-domain>]` where the key is computed by `getBaseDomain(hostname)` — last two labels of the hostname (`www.foo.example.com` → `example.com`). These keys are a public API of the extension; never rename or reformat them. The full inventory lives in [`pwa-inventory.md`](./pwa-inventory.md).
+* **Storage keys are domain strings.** Each saved snippet lives under `chrome.storage.local[<base-domain>]` where the key is computed by `resolveBaseHost(hostname)` (the renamed `getBaseDomain`) — last two labels of the hostname (`www.foo.example.com` → `example.com`). These keys are a public API of the extension; never rename or reformat them. The full inventory lives in [`pwa-inventory.md`](./pwa-inventory.md).
 * **Two entry surfaces, one HTML.** `popup.html` must keep working as both a Chrome `action` popup (fixed-size, mouse-driven, opens on toolbar click) and an Opera / Firefox `sidebar_action` panel (variable width, can be tall). Don't bake fixed pixel widths into the body.
 * **Content script runs on every URL.** `content.js` is registered at `document_start` with `<all_urls>`. Keep it small and side-effect-free until a saved snippet is found, and don't introduce throws on the top-level path.
-* **Permissions are intentionally narrow.** Active operations use `activeTab` + `scripting` so the extension only touches a tab when the user opens the popup. Don't expand to `tabs` host access without a feature that requires it.
+* **Identifier surface is deliberately neutral.** The extension `name`, the injected `<style>` element id (`__ps_kx9w4_style`), the runtime DOM additions, and the message-channel types (`PS_START_PICK`, …) are intentionally generic / randomized so anti-extension detection scripts can't fingerprint the extension by name or marker. If you change one, change the other end of the channel too.
+* **Permissions are intentionally narrow.** Active operations use `activeTab` + `scripting` so the extension only touches a tab when the user opens the popup. `contextMenus` is held by the background service worker only, for the right-click "Download this video" entry. Don't expand to `tabs` host access without a feature that requires it.
 * **No external network.** Snippets are local-only. There is no telemetry, no remote config, no auth. Adding a network call is a structural change and should be a separate PR.
 * **Vanilla JS, no dependencies.** No npm, no bundler. Keep it that way unless a feature genuinely cannot be done without a dep.
 
@@ -36,14 +37,16 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 | Workflow | Trigger | Scope | Deploys |
 | --- | --- | --- | --- |
 | `ci.yml` | PR / push touching `domain-css-injector-v2/**` or workflow itself | Validates `manifest.json`, runs `node --check` over each `.js`, confirms icon assets exist | Nothing (validation only) |
+| `release.yml` | tag push `v*` or manual dispatch | Validates, then zips `domain-css-injector-v2/` into `pageside-<version>.zip` | Uploads as workflow artifact; on tag pushes also attaches to a GitHub Release |
 
 **What fires on a given change:**
 
 | Change | CI | Deploy |
 | --- | --- | --- |
-| Extension source in `domain-css-injector-v2/` | ✓ | — (manual: zip + upload) |
+| Extension source in `domain-css-injector-v2/` | ✓ | — (release on `v*` tag) |
 | Docs (`README.md`, `CLAUDE.md`, `pwa-inventory.md`) | — | — |
 | `.github/workflows/*.yml` | ✓ | — |
+| Tag `v*` pushed | ✓ | ✓ (zip + GitHub Release) |
 
 **Concurrency**: `ci` cancels superseded runs per branch.
 
@@ -67,15 +70,17 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 ```
 opera/
 ├── domain-css-injector-v2/
-│   ├── manifest.json            # MV3 manifest — action + sidebar_action + content script
+│   ├── manifest.json            # MV3 manifest — action + sidebar_action + content script + service worker
 │   ├── popup.html               # editor UI (popup or sidebar)
-│   ├── popup.js                 # editor / inspect / TTS / downloads
+│   ├── popup.js                 # editor / inspect / TTS / popup-driven downloads
 │   ├── content.js               # CSS injector + inspect-mode overlay
+│   ├── background.js            # service worker — context-menu "Download this video"
 │   └── icons/                   # 16 / 48 / 128 px PNGs
 ├── .github/
 │   ├── dependabot.yml           # weekly GitHub Actions updates
 │   └── workflows/
-│       └── ci.yml               # validation
+│       ├── ci.yml               # validation
+│       └── release.yml          # zip + GitHub Release on v* tag
 ├── pwa-inventory.md             # storage / manifest inventory
 ├── README.md                    # user-facing docs
 ├── CLAUDE.md                    # this file
@@ -86,7 +91,7 @@ opera/
 
 `action` (toolbar popup) is the Chrome / Edge entry point. `sidebar_action` is the Opera / Firefox entry point. Both target the same `popup.html`. Chrome silently ignores `sidebar_action`; Opera honors both keys but uses the sidebar surface preferentially. Don't remove either without checking the other surface.
 
-Chrome on Android does not support extensions — that platform is intentionally out of scope. Desktop Chrome on Windows / macOS / Linux is the primary target alongside Opera.
+Chrome on Android does not support extensions, but Chromium-fork phone browsers (Kiwi, Mises, Yandex, Lemur) and Firefox Nightly for Android do — see the **Mobile installation** section in `README.md`. Desktop Chrome on Windows / macOS / Linux remains the primary target alongside Opera.
 
 ## Post-task self-check
 
