@@ -1,83 +1,83 @@
-function getBaseDomain(hostname){
+function resolveBaseHost(hostname){
   const parts = hostname.split('.').reverse();
   if (parts.length > 2) return parts[1] + '.' + parts[0];
   return hostname;
 }
 (function(){
   try{
-    const domain = getBaseDomain(window.location.hostname);
-    chrome.storage.local.get([domain], (res)=>{
-      if(res[domain]){
-        const style = document.createElement('style');
-        style.id='dynamicCssStyle';
-        style.textContent = res[domain];
-        document.documentElement.appendChild(style);
+    const host = resolveBaseHost(window.location.hostname);
+    chrome.storage.local.get([host], (res)=>{
+      if(res[host]){
+        const node = document.createElement('style');
+        node.id='__ps_kx9w4_style';
+        node.textContent = res[host];
+        document.documentElement.appendChild(node);
       }
     });
     chrome.storage.onChanged.addListener((changes, areaName)=>{
-      if(areaName==='local' && changes[domain]){
-        const oldStyle = document.getElementById('dynamicCssStyle');
-        if(oldStyle) oldStyle.remove();
-        const newStyle = document.createElement('style');
-        newStyle.id='dynamicCssStyle';
-        newStyle.textContent = changes[domain].newValue||'';
-        document.documentElement.appendChild(newStyle);
+      if(areaName==='local' && changes[host]){
+        const oldNode = document.getElementById('__ps_kx9w4_style');
+        if(oldNode) oldNode.remove();
+        const nextNode = document.createElement('style');
+        nextNode.id='__ps_kx9w4_style';
+        nextNode.textContent = changes[host].newValue||'';
+        document.documentElement.appendChild(nextNode);
       }
     });
-  }catch(e){console.error('CSS injection error:', e);}
+  }catch(e){console.error('style injection error:', e);}
 })();
 if (window.top === window.self) {
-let inspectMode = false;
-let highlightBox;
-let tooltipBox;
-let lingerTimeout;
-function createHighlightBox() {
-    highlightBox = document.createElement('div');
-    highlightBox.style.position = 'absolute';
-    highlightBox.style.background = 'rgba(0, 153, 255, 0.3)';
-    highlightBox.style.border = '2px solid #0099ff';
-    highlightBox.style.zIndex = '999999';
-    highlightBox.style.pointerEvents = 'none';
-    document.body.appendChild(highlightBox);
-    tooltipBox = document.createElement('div');
-    tooltipBox.style.position = 'absolute';
-    tooltipBox.style.background = '#0099ff';
-    tooltipBox.style.color = '#fff';
-    tooltipBox.style.fontSize = '12px';
-    tooltipBox.style.padding = '2px 4px';
-    tooltipBox.style.borderRadius = '3px';
-    tooltipBox.style.zIndex = '1000000';
-    tooltipBox.style.pointerEvents = 'none';
-    document.body.appendChild(tooltipBox);
+let pickerActive = false;
+let pickerFrame;
+let pickerLabel;
+let pickerLinger;
+function buildPickerOverlay() {
+    pickerFrame = document.createElement('div');
+    pickerFrame.style.position = 'absolute';
+    pickerFrame.style.background = 'rgba(0, 153, 255, 0.3)';
+    pickerFrame.style.border = '2px solid #0099ff';
+    pickerFrame.style.zIndex = '999999';
+    pickerFrame.style.pointerEvents = 'none';
+    document.body.appendChild(pickerFrame);
+    pickerLabel = document.createElement('div');
+    pickerLabel.style.position = 'absolute';
+    pickerLabel.style.background = '#0099ff';
+    pickerLabel.style.color = '#fff';
+    pickerLabel.style.fontSize = '12px';
+    pickerLabel.style.padding = '2px 4px';
+    pickerLabel.style.borderRadius = '3px';
+    pickerLabel.style.zIndex = '1000000';
+    pickerLabel.style.pointerEvents = 'none';
+    document.body.appendChild(pickerLabel);
 }
-function startInspectMode() {
-    if (inspectMode) return;
-    inspectMode = true;
-    createHighlightBox();
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('click', onClickElement, true);
+function enterPickerMode() {
+    if (pickerActive) return;
+    pickerActive = true;
+    buildPickerOverlay();
+    document.addEventListener('mousemove', onPickerMove);
+    document.addEventListener('click', onPickerSelect, true);
 }
-function stopInspectMode(removeTooltip = true) {
-    inspectMode = false;
-    if (highlightBox) {
-        highlightBox.remove();
-        highlightBox = null;
+function exitPickerMode(removeLabel = true) {
+    pickerActive = false;
+    if (pickerFrame) {
+        pickerFrame.remove();
+        pickerFrame = null;
     }
-    if (removeTooltip && tooltipBox) {
-        tooltipBox.remove();
-        tooltipBox = null;
+    if (removeLabel && pickerLabel) {
+        pickerLabel.remove();
+        pickerLabel = null;
     }
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('click', onClickElement, true);
+    document.removeEventListener('mousemove', onPickerMove);
+    document.removeEventListener('click', onPickerSelect, true);
 }
-function onMouseMove(e) {
+function onPickerMove(e) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || el === highlightBox || el === tooltipBox) return;
+    if (!el || el === pickerFrame || el === pickerLabel) return;
     const rect = el.getBoundingClientRect();
-    highlightBox.style.top = rect.top + window.scrollY + 'px';
-    highlightBox.style.left = rect.left + window.scrollX + 'px';
-    highlightBox.style.width = rect.width + 'px';
-    highlightBox.style.height = rect.height + 'px';
+    pickerFrame.style.top = rect.top + window.scrollY + 'px';
+    pickerFrame.style.left = rect.left + window.scrollX + 'px';
+    pickerFrame.style.width = rect.width + 'px';
+    pickerFrame.style.height = rect.height + 'px';
     let text = '';
     if (el.id) {
         text = '#' + el.id;
@@ -86,50 +86,50 @@ function onMouseMove(e) {
     } else {
         text = el.tagName.toLowerCase();
     }
-    if (!tooltipBox.dataset.copied) {
-        tooltipBox.textContent = "click to copy " + text;
+    if (!pickerLabel.dataset.copied) {
+        pickerLabel.textContent = "click to copy " + text;
     }
-    tooltipBox.style.top = e.pageY + 15 + 'px';
-    tooltipBox.style.left = e.pageX + 15 + 'px';
+    pickerLabel.style.top = e.pageY + 15 + 'px';
+    pickerLabel.style.left = e.pageX + 15 + 'px';
 }
-function onClickElement(e) {
+function onPickerSelect(e) {
     e.preventDefault();
     e.stopPropagation();
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || el === highlightBox) return;
+    if (!el || el === pickerFrame) return;
     let text = '';
     if (el.id) text = '#' + el.id;
     else if (el.className && typeof el.className === 'string') text = '.' + el.className.trim().replace(/\s+/g, '.');
     else text = el.tagName.toLowerCase();
     navigator.clipboard.writeText(text).then(() => {
-        if (!tooltipBox) {
-            tooltipBox = document.createElement('div');
-            tooltipBox.style.position = 'absolute';
-            tooltipBox.style.background = '#0099ff';
-            tooltipBox.style.color = '#fff';
-            tooltipBox.style.fontSize = '12px';
-            tooltipBox.style.padding = '2px 4px';
-            tooltipBox.style.borderRadius = '3px';
-            tooltipBox.style.zIndex = '1000000';
-            document.body.appendChild(tooltipBox);
+        if (!pickerLabel) {
+            pickerLabel = document.createElement('div');
+            pickerLabel.style.position = 'absolute';
+            pickerLabel.style.background = '#0099ff';
+            pickerLabel.style.color = '#fff';
+            pickerLabel.style.fontSize = '12px';
+            pickerLabel.style.padding = '2px 4px';
+            pickerLabel.style.borderRadius = '3px';
+            pickerLabel.style.zIndex = '1000000';
+            document.body.appendChild(pickerLabel);
         }
-        tooltipBox.textContent = `"${text}" copied to clipboard!`;
-        tooltipBox.dataset.copied = "true";
-        tooltipBox.style.top = e.pageY + 15 + 'px';
-        tooltipBox.style.left = e.pageX + 15 + 'px';
-        stopInspectMode(false);
-        clearTimeout(lingerTimeout);
-        lingerTimeout = setTimeout(() => {
-            if (tooltipBox) {
-                tooltipBox.remove();
-                tooltipBox = null;
+        pickerLabel.textContent = `"${text}" copied to clipboard!`;
+        pickerLabel.dataset.copied = "true";
+        pickerLabel.style.top = e.pageY + 15 + 'px';
+        pickerLabel.style.left = e.pageX + 15 + 'px';
+        exitPickerMode(false);
+        clearTimeout(pickerLinger);
+        pickerLinger = setTimeout(() => {
+            if (pickerLabel) {
+                pickerLabel.remove();
+                pickerLabel = null;
             }
         }, 3000);
     });
 }
 chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'START_INSPECT') {
-        startInspectMode();
+    if (msg.type === 'PS_START_PICK') {
+        enterPickerMode();
     }
 });
 }
