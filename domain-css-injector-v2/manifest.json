@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pageside",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Per-site style helper with element picker, text reader, and media saver.",
   "permissions": [
     "storage",
@@ -41,13 +41,17 @@
     "gecko": {
       "id": "{f2ee7814-cda2-4bda-8deb-3f6bb90d5080}",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
