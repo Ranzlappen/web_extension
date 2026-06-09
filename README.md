@@ -108,7 +108,8 @@ Once installed:
 1. Visit any HTTPS site.
 2. Open the Pageside popup. The detected site label should match the page's base domain.
 3. Try **Save Style Changes** with a tiny rule like `body { background: #102030; }` to confirm CSS is being injected on mobile.
-4. Long-press any `<video>` element on a video site and pick **Download this video** to confirm the context-menu integration is wired up.
+4. Tap **Select Container**, then drag a finger over the page to preview the highlight and lift / tap to copy the element's selector — the picker is touch-driven, so no mouse is needed.
+5. Tap **Download Video Media** to scan the page; found sources appear as an in-popup list — tap one to download. (The right-click "Download this video" context-menu entry is desktop-only; long-press support varies by mobile build, so the in-popup list is the reliable mobile path.)
 
 If the toolbar entry never appears after install, double-check that the `manifest.json` is at the **root** of your zip (not inside a `domain-css-injector-v2/` sub-folder).
 
