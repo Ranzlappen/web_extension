@@ -122,7 +122,15 @@ function renderSnippets(items) {
         const div = document.createElement('div');
         div.className = 'kv';
         const preview = items[k].length > 200 ? items[k].slice(0, 200) + '…' : items[k];
-        div.innerHTML = `<strong>${k}</strong><div class="small">${preview}</div>`;
+        // Built with DOM APIs / textContent rather than innerHTML so storage
+        // keys (domains) and snippet bodies can never be parsed as markup.
+        const title = document.createElement('strong');
+        title.textContent = k;
+        const body = document.createElement('div');
+        body.className = 'small';
+        body.textContent = preview;
+        div.appendChild(title);
+        div.appendChild(body);
         div.addEventListener('click', () => {
             document.getElementById('cssInput').value = items[k];
             showStatus(`Loaded ${k} into editor`, 1500);
