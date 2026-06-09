@@ -37,8 +37,17 @@
       "128": "icons/icon128.png"
     }
   },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{f2ee7814-cda2-4bda-8deb-3f6bb90d5080}",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
   },
   "content_scripts": [
     {

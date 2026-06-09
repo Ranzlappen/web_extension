@@ -38,9 +38,16 @@ The extension ships a single MV3 background service worker at `domain-css-inject
 ```jsonc
 // manifest.json
 "background": {
-  "service_worker": "background.js"
+  "service_worker": "background.js",
+  "scripts": ["background.js"]
 }
 ```
+
+`service_worker` is the Chromium entry point; `scripts` is the Firefox-compatible
+fallback (Firefox MV3 runs `background.scripts` as an event page). Both point at
+the same `background.js`, which registers all its listeners at top level so it
+works under either runtime. Chrome ignores `scripts`; Firefox ignores
+`service_worker`. AMO validation **requires** the pairing — do not drop `scripts`.
 
 It subscribes to:
 
@@ -82,6 +89,14 @@ Every path-shaped value in `domain-css-injector-v2/manifest.json` and the file i
 | `sidebar_action.default_icon["128"]` | `icons/icon128.png` | ✓ |
 | `content_scripts[0].js[0]` | `content.js` | `domain-css-injector-v2/content.js` ✓ |
 | `background.service_worker` | `background.js` | `domain-css-injector-v2/background.js` ✓ |
+| `background.scripts[0]` | `background.js` | `domain-css-injector-v2/background.js` ✓ (Firefox fallback) |
+
+The Firefox add-on identity lives in `browser_specific_settings.gecko`:
+
+| Manifest field | Value | Notes |
+| --- | --- | --- |
+| `browser_specific_settings.gecko.id` | `{f2ee7814-cda2-4bda-8deb-3f6bb90d5080}` | **Permanent** add-on ID on AMO. Required for MV3. Once published it can never change without creating a brand-new listing — treat it as sacred. |
+| `browser_specific_settings.gecko.data_collection_permissions.required` | `["none"]` | Declares the extension collects no user data (it has no network calls). Required for new Firefox extensions. |
 
 `name`, `version`, `description`, and the permissions list are part of the same contract — changing `name` will rename the entry on every installed user's toolbar / sidebar; changing `version` is required for any update; changing the permissions set requires re-prompting the user. The current obfuscation pass renamed `name` to `Pageside` (intentionally neutral) and added the `contextMenus` permission to back the right-click "Download this video" entry; both are intentional and documented.
 
