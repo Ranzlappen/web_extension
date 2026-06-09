@@ -17,19 +17,42 @@ function looksLikeMedia(url) {
     return /\.(mp4|webm|m4v|mov|m3u8|mpd|mkv|avi|flv|wmv)(\?|#|$)/i.test(url);
 }
 
-function formatCandidate(candidate, index) {
-    const source = candidate.source || 'unknown';
-    const quality = candidate.qualityLabel ? ` (${candidate.qualityLabel})` : '';
-    const fileHint = candidate.filenameHint ? ` [${candidate.filenameHint}]` : '';
-    return `${index + 1}. ${source}${quality}${fileHint}\n${candidate.url}`;
-}
-
-speechSynthesis.onvoiceschanged = () => {
+// Voice lists load asynchronously and are frequently empty on mobile
+// Chromium until the engine warms up, so pick defensively and never hard-depend
+// on a specific voice — fall back through en-US, any English, then whatever
+// exists, and let the browser default if the list is still empty.
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return null;
   const voices = speechSynthesis.getVoices();
-  ttsVoice =
-    voices.find(v => v.name.includes('Google US English')) ||
-    voices.find(v => v.lang === 'en-US');
-};
+  if (!voices || !voices.length) return null;
+  return (
+    voices.find(v => v.name && v.name.includes('Google US English')) ||
+    voices.find(v => v.lang === 'en-US') ||
+    voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en')) ||
+    voices[0]
+  );
+}
+if ('speechSynthesis' in window) {
+  speechSynthesis.onvoiceschanged = () => { ttsVoice = pickVoice(); };
+  ttsVoice = pickVoice();
+}
+function speak(text) {
+  if (!('speechSynthesis' in window)) {
+    showStatus('Speech synthesis is not available in this browser.', 3000);
+    return;
+  }
+  try {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    const voice = ttsVoice || pickVoice();
+    if (voice) utterance.voice = voice;
+    utterance.onerror = () => showStatus('Speech failed on this device.', 3000);
+    speechSynthesis.speak(utterance);
+  } catch (_) {
+    showStatus('Speech failed to start.', 3000);
+  }
+}
 function resolveBaseHost(hostname) {
     const parts = hostname.split('.').reverse();
     return parts.length > 2 ? `${parts[1]}.${parts[0]}` : hostname;
@@ -124,7 +147,9 @@ async function collectMediaSources() {
         return [];
     }
 
-    const results = await chrome.scripting.executeScript({
+    let results;
+    try {
+        results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         allFrames: true,
         func: () => {
@@ -196,7 +221,11 @@ async function collectMediaSources() {
 
             return candidates;
         }
-    });
+        });
+    } catch (err) {
+        showStatus(`Cannot scan this page: ${err?.message || err}`, 3000);
+        return [];
+    }
 
     const merged = [];
     const dedup = new Set();
@@ -224,39 +253,13 @@ async function collectMediaSources() {
     return merged;
 }
 
-async function pickAndSaveMedia() {
-    const mediaUrls = await collectMediaSources();
-    mediaCandidates = mediaUrls;
-    if (!mediaUrls.length) {
-        showStatus('No video media found on this page.');
+function downloadCandidate(candidate) {
+    if (!candidate || !candidate.downloadable) {
+        showStatus('That media is a blob stream and cannot be downloaded directly.', 3500);
         return;
     }
-
-    const options = mediaUrls
-        .map((candidate, i) => formatCandidate(candidate, i))
-        .join('\n');
-
-    const selection = prompt(`Select video to download:
-
-${options}
-
-Enter number:`);
-    const selectionNumber = Number(selection);
-
-    if (!selection || Number.isNaN(selectionNumber) || selectionNumber < 1 || selectionNumber > mediaUrls.length) {
-        showStatus('Download cancelled.');
-        return;
-    }
-
-    const selected = mediaUrls[selectionNumber - 1];
-    if (!selected.downloadable) {
-        showStatus('Selected media is a blob stream and cannot be downloaded directly.', 3500);
-        return;
-    }
-
-    const selectedUrl = selected.url;
     chrome.downloads.download({
-        url: selectedUrl,
+        url: candidate.url,
         conflictAction: 'uniquify'
     }, (downloadId) => {
         if (chrome.runtime.lastError || !downloadId) {
@@ -265,6 +268,49 @@ Enter number:`);
         }
         showStatus('Video download started.', 3000);
     });
+}
+
+// Renders the found media as an in-popup tappable list. prompt() is unreliable
+// inside mobile extension popups, so each candidate is a real button instead.
+function renderMediaCandidates(list) {
+    const container = document.getElementById('mediaList');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!list.length) {
+        container.textContent = 'No video media found on this page.';
+        return;
+    }
+    list.forEach((candidate, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'media-item';
+        const quality = candidate.qualityLabel ? ` (${candidate.qualityLabel})` : '';
+        const title = document.createElement('span');
+        title.className = 'media-title';
+        title.textContent = `${i + 1}. ${candidate.source || 'media'}${quality}`;
+        const urlEl = document.createElement('span');
+        urlEl.className = 'small';
+        urlEl.textContent = candidate.url;
+        btn.appendChild(title);
+        btn.appendChild(urlEl);
+        if (!candidate.downloadable) {
+            btn.disabled = true;
+            btn.title = 'Blob stream — cannot be downloaded directly';
+        } else {
+            btn.addEventListener('click', () => downloadCandidate(candidate));
+        }
+        container.appendChild(btn);
+    });
+}
+
+async function pickAndSaveMedia() {
+    showStatus('Scanning page for video media…', 1500);
+    const mediaUrls = await collectMediaSources();
+    mediaCandidates = mediaUrls;
+    renderMediaCandidates(mediaUrls);
+    if (mediaUrls.length) {
+        showStatus(`Found ${mediaUrls.length} media source(s). Tap one to download.`, 3000);
+    }
 }
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== activeHost) {
@@ -307,13 +353,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     reloadSnippets();
 });
 document.addEventListener('DOMContentLoaded', () => {
+  function startPick(tabId) {
+    chrome.tabs.sendMessage(tabId, { type: 'PS_START_PICK' }, (resp) => {
+      if (!chrome.runtime.lastError && resp) {
+        window.close();
+        return;
+      }
+      // The registered content script isn't reachable (e.g. the page was open
+      // before the extension was installed/reloaded). Inject it once, then retry.
+      chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }, () => {
+        if (chrome.runtime.lastError) {
+          showStatus('Cannot inspect this page.', 3000);
+          return;
+        }
+        chrome.tabs.sendMessage(tabId, { type: 'PS_START_PICK' }, () => {
+          if (chrome.runtime.lastError) {
+            showStatus('Cannot inspect this page.', 3000);
+          } else {
+            window.close();
+          }
+        });
+      });
+    });
+  }
   const inspectBtn = document.getElementById('inspectBtn');
   if (inspectBtn) {
     inspectBtn.addEventListener('click', () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'PS_START_PICK' });
-        }
+        if (tabs[0]) startPick(tabs[0].id);
       });
     });
   }
@@ -329,15 +396,15 @@ document.addEventListener('DOMContentLoaded', () => {
               func: () => window.getSelection().toString()
             },
             (results) => {
+              if (chrome.runtime.lastError) {
+                showStatus(`Cannot read this page: ${chrome.runtime.lastError.message}`, 3000);
+                return;
+              }
               const selectedText = results && results[0] && results[0].result;
               if (selectedText && selectedText.trim() !== '') {
-                // Speak the selected text
-                const utterance = new SpeechSynthesisUtterance(selectedText);
-				utterance.lang = 'en-US';
-				if (ttsVoice) utterance.voice = ttsVoice;
-				speechSynthesis.speak(utterance);
+                speak(selectedText);
               } else {
-                alert('No text selected on the page.');
+                showStatus('No text selected on the page.', 2500);
               }
             }
           );

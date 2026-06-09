@@ -37,16 +37,17 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 | Workflow | Trigger | Scope | Deploys |
 | --- | --- | --- | --- |
 | `ci.yml` | PR / push touching `domain-css-injector-v2/**` or workflow itself | Validates `manifest.json`, runs `node --check` over each `.js`, confirms icon assets exist | Nothing (validation only) |
-| `release.yml` | tag push `v*` or manual dispatch | Validates, then zips `domain-css-injector-v2/` into `pageside-<version>.zip` | Uploads as workflow artifact; on tag pushes also attaches to a GitHub Release |
+| `release.yml` | tag push `v*` or manual dispatch | Validates, then zips `domain-css-injector-v2/` into `pageside-<version>.zip` (and verifies `manifest.json` lands at the zip root) | Uploads as workflow artifact and attaches the zip to a GitHub Release. **Manual dispatch auto-increments**: pick `patch`/`minor`/`major` and the workflow bumps `manifest.json`, commits the bump `[skip ci]`, pushes the `vX.Y.Z` tag, and publishes the Release — no manual version edit or tagging. Tag pushes release at that exact tag with no bump. |
 
 **What fires on a given change:**
 
 | Change | CI | Deploy |
 | --- | --- | --- |
-| Extension source in `domain-css-injector-v2/` | ✓ | — (release on `v*` tag) |
+| Extension source in `domain-css-injector-v2/` | ✓ | — (release via tag push or dispatch) |
 | Docs (`README.md`, `CLAUDE.md`, `pwa-inventory.md`) | — | — |
 | `.github/workflows/*.yml` | ✓ | — |
 | Tag `v*` pushed | ✓ | ✓ (zip + GitHub Release) |
+| Manual `release.yml` dispatch | — (bump commit is `[skip ci]`) | ✓ (auto-bump + tag + zip + GitHub Release) |
 
 **Concurrency**: `ci` cancels superseded runs per branch.
 

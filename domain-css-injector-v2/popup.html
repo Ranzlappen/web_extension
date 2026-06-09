@@ -18,9 +18,14 @@
         #domainInfo{font-size:0.9em;color:#cfd2dc;margin-bottom:8px}
 		#status{min-height:22px;margin-top:8px;margin-bottom:8px;color:#cfd2dc;}
         .hint{font-size:0.8em;color:#9aa3b2;margin-bottom:8px}
+        .small{font-size:0.8em;color:#9aa3b2;word-break:break-all}
         .kv{font-family:monospace;white-space:pre-wrap;padding:8px 0}
         .controls{display:flex;gap:6px;flex-wrap:wrap}
         .controls button{flex:1 1 120px;width:auto;border-radius:10px}
+        #mediaList{margin-top:8px}
+        #mediaList:empty{display:none}
+        .media-item{display:block;text-align:left}
+        .media-title{display:block;font-weight:bold}
     </style>
 </head>
 
@@ -49,7 +54,8 @@ body    {style:example;}
 		<div class="controls">
 			<button id="downloadVideoBtn">Download Video Media</button>
 		</div>
-		<div class="hint">Tip: right-click any video on the page and choose "Download this video".</div>
+		<div id="mediaList"></div>
+		<div class="hint">Tip: on desktop you can also right-click a video and choose "Download this video".</div>
         <h4>Saved snippets</h4>
         <div class="controls">
             <button id="refreshBtn">Refresh list</button>
