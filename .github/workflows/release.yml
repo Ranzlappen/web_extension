@@ -78,6 +78,22 @@ jobs:
           echo "artifact=dist/$OUT" >> "$GITHUB_OUTPUT"
           ls -la dist/
 
+      - name: Verify manifest.json is at the zip root
+        run: |
+          set -e
+          # Stores (AMO, Chrome Web Store) require manifest.json at the archive
+          # root, not nested in a containing folder. Fail loudly if it drifts.
+          if ! unzip -l "${{ steps.build.outputs.artifact }}" | grep -qE ' manifest\.json$'; then
+            echo "::error::manifest.json is not at the root of the zip. The archive must contain the extension's files directly, not a wrapping folder."
+            unzip -l "${{ steps.build.outputs.artifact }}"
+            exit 1
+          fi
+          echo "manifest.json found at zip root."
+
+      # NOTE: Downloading this artifact from the Actions UI re-zips it (GitHub
+      # wraps artifacts), producing a zip-in-zip with no manifest at the root.
+      # For store/AMO uploads, use the asset attached to the GitHub Release
+      # (tag push), or build the zip locally.
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
