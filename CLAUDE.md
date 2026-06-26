@@ -6,7 +6,7 @@ Per-domain CSS injection plus a small toolbox (selector inspector, TTS reader, v
 
 Single-module Chromium / Firefox browser extension. No bundler, no build step, no backend. The extension is loaded directly from the `domain-css-injector-v2/` folder and persists everything to `chrome.storage.local`.
 
-* **Pageside** (`domain-css-injector-v2/`) — Manifest V3 extension. `popup.html` is the editor UI, served as the toolbar popup on Chrome / Edge (`action`) and as the sidebar panel on Opera / Firefox (`sidebar_action`). `content.js` runs at `document_start` on every URL, reads the saved CSS for the page's base domain, and injects a `<style id="__ps_kx9w4_style">` element. `popup.js` drives the editor, the inspect-element overlay, the Web-Speech TTS, and the popup-driven `chrome.downloads` video pipeline. `background.js` is the MV3 service worker — it registers the `chrome.contextMenus` "Download this video" entry against `<video>` elements and routes the click into `chrome.downloads`. The user-facing extension name is intentionally a generic value so detection scripts that fingerprint by extension name don't trip; the directory and storage-key contract are unchanged.
+* **Pageside** (`domain-css-injector-v2/`) — Manifest V3 extension. `popup.html` is the editor UI, served as the toolbar popup on Chrome / Edge (`action`) and as the sidebar panel on Opera / Firefox (`sidebar_action`). `content.js` runs at `document_start` on every URL, reads the saved CSS for the page's base domain, and injects a `<style id="__ps_kx9w4_style">` element. `popup.js` drives the editor, the inspect-element overlay, the Web-Speech TTS, and the popup-driven `chrome.downloads` video pipeline. Two sibling modules load alongside it: `popup-notepad.js` (per-domain notepad backed by `chrome.storage.local["__ps_notes"]`) and `popup-password.js` (a Web-Crypto password / passphrase generator that stores nothing). `background.js` is the MV3 service worker — it registers the `chrome.contextMenus` "Download this video" entry against `<video>` elements and routes the click into `chrome.downloads`. The user-facing extension name is intentionally a generic value so detection scripts that fingerprint by extension name don't trip; the directory and storage-key contract are unchanged.
 
 ## Build & Development
 
@@ -25,7 +25,8 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 ## Key Conventions
 
 * **Storage keys are domain strings.** Each saved snippet lives under `chrome.storage.local[<base-domain>]` where the key is computed by `resolveBaseHost(hostname)` (the renamed `getBaseDomain`) — last two labels of the hostname (`www.foo.example.com` → `example.com`). These keys are a public API of the extension; never rename or reformat them. The full inventory lives in [`pwa-inventory.md`](./pwa-inventory.md).
-* **Two entry surfaces, one HTML.** `popup.html` must keep working as both a Chrome `action` popup (fixed-size, mouse-driven, opens on toolbar click) and an Opera / Firefox `sidebar_action` panel (variable width, can be tall). Don't bake fixed pixel widths into the body.
+* **Internal keys use the reserved `__ps_` prefix.** Non-CSS state (currently `__ps_notes`, the per-domain notepad map) is namespaced under `__ps_` so it can never collide with a bare-domain CSS key. Any such key MUST be excluded from `renderSnippets()` and from **Export JSON** (both gated on `isReservedKey()` in `popup.js`) so it never surfaces as a fake CSS snippet or leaks into a backup. Reuse this prefix for any future internal key.
+* **Two entry surfaces, one HTML.** `popup.html` must keep working as both a Chrome `action` popup (fixed-size, mouse-driven, opens on toolbar click) and an Opera / Firefox `sidebar_action` panel (variable width, can be tall). Don't bake fixed pixel widths into the body. The UI is a set of native `<details>`/`<summary>` collapsible sections (Style / Notes / Password / Tools) tuned for mobile/Kiwi: 16px base font (18px ≥520px), `env(safe-area-inset-*)` padding, 44px tap targets. `popup.html` loads `popup.js` (orchestrator), then `popup-notepad.js` and `popup-password.js` as classic scripts sharing its global scope; `popup.js` fires a `ps:hostchange` `CustomEvent` on each domain switch that the notepad module consumes.
 * **Content script runs on every URL.** `content.js` is registered at `document_start` with `<all_urls>`. Keep it small and side-effect-free until a saved snippet is found, and don't introduce throws on the top-level path.
 * **Identifier surface is deliberately neutral.** The extension `name`, the injected `<style>` element id (`__ps_kx9w4_style`), the runtime DOM additions, and the message-channel types (`PS_START_PICK`, …) are intentionally generic / randomized so anti-extension detection scripts can't fingerprint the extension by name or marker. If you change one, change the other end of the channel too.
 * **Permissions are intentionally narrow.** Active operations use `activeTab` + `scripting` so the extension only touches a tab when the user opens the popup. `contextMenus` is held by the background service worker only, for the right-click "Download this video" entry. Don't expand to `tabs` host access without a feature that requires it.
@@ -72,8 +73,10 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 opera/
 ├── domain-css-injector-v2/
 │   ├── manifest.json            # MV3 manifest — action + sidebar_action + content script + service worker
-│   ├── popup.html               # editor UI (popup or sidebar)
-│   ├── popup.js                 # editor / inspect / TTS / popup-driven downloads
+│   ├── popup.html               # collapsible-section UI (popup or sidebar)
+│   ├── popup.js                 # orchestrator — editor / inspect / TTS / downloads / snippets
+│   ├── popup-notepad.js         # per-domain notepad module (__ps_notes)
+│   ├── popup-password.js        # crypto password / passphrase generator module
 │   ├── content.js               # CSS injector + inspect-mode overlay
 │   ├── background.js            # service worker — context-menu "Download this video"
 │   └── icons/                   # 16 / 48 / 128 px PNGs

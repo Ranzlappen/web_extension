@@ -8,9 +8,11 @@
 
 ## What this is
 
-A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, a Web-Speech TTS reader for selected text, a media-URL extractor that can download `<video>` sources straight from the active tab, and a right-click **Download this video** entry on any video element on the page.
+A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, a Web-Speech TTS reader for selected text, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, a **per-domain notepad** for private site notes, and a **cryptographic password / passphrase generator**.
 
-Everything is stored locally via `chrome.storage.local` — there is no server, no account, and no telemetry.
+The UI is organized into collapsible sections (Style / Notes / Password / Tools) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
+
+Everything is stored locally via `chrome.storage.local` — there is no server, no account, and no telemetry. Generated passwords are never stored.
 
 ---
 
@@ -28,7 +30,9 @@ The most common tasks. For anything not listed, see [Developer Setup](#developer
 | Copy a selector from the page | Click **Select Container**, hover over the element, click it. The selector is copied to the clipboard. |
 | Read selected text aloud | Select text on the page, open the editor, click **Read Selected Text**. |
 | Download a `<video>` from a page | Either right-click the video on the page and choose **Download this video**, or open the editor and click **Download Video Media**. |
-| Back up all snippets | Open the editor, click **Export JSON**. |
+| Keep a private note for a site | Open the **Notes** section, type — it auto-saves per domain (or tap **Save note**). |
+| Generate a strong password | Open the **Password** section, set the options, tap **Generate**, then **Copy**. |
+| Back up all snippets | Open the editor, click **Export JSON**. (Private notes are never included in the export.) |
 | Restore a snippet on another browser | Open the editor on the target site, paste the JSON value into the editor, **Save**. |
 
 ---
@@ -184,9 +188,35 @@ This is the fastest path when you can see the video you want. It uses the `conte
 1. Open the page that has a `<video>` element.
 2. Open the editor and click **Download Video Media**.
 3. The popup scans every frame for `video.currentSrc`, `<source>` tags, media-typed `<a href>` links, network resource entries, and (on YouTube) `ytInitialPlayerResponse`.
-4. A prompt lists every candidate ranked by likelihood of being a real downloadable file. Enter the number you want.
+4. Found sources appear as an in-popup tappable list, ranked by likelihood of being a real downloadable file. Tap one to download it. (Blob streams are shown disabled — they cannot be fetched directly.)
 
 Use B when the video tag is hidden, lazy-loaded, or you need an alternate quality / source URL.
+
+---
+
+## Per-domain notes
+
+The **Notes** section keeps a private, free-form note bound to the current site's base domain, stored locally in `chrome.storage.local` under the reserved `__ps_notes` key.
+
+1. Open the editor and expand **Notes**.
+2. Type anything — it **auto-saves** ~0.6s after you stop typing (or tap **Save note** to persist immediately).
+3. Switch to a page on a different domain and the note reloads for that domain automatically.
+4. A small dot next to the **Notes** heading indicates the current domain has a saved note. **Clear note** empties it (and removes the entry from storage).
+
+Notes are deliberately **excluded** from **Export JSON**, so a shared snippet backup never leaks your private notes.
+
+---
+
+## Password generator
+
+The **Password** section generates strong secrets using the browser's cryptographic RNG (`crypto.getRandomValues` with unbiased rejection sampling — never `Math.random`). Nothing generated is ever stored; copy it before closing the popup.
+
+* **Length** slider, and toggles for **lowercase / uppercase / digits / symbols**.
+* **Exclude ambiguous** strips easily-confused characters (`0 O 1 l I`).
+* **Require each selected set** guarantees at least one character from every enabled set.
+* **Passphrase mode** produces a hyphenated word passphrase from a built-in 256-word list (8 bits of entropy per word) — easier to remember. In this mode the slider chooses the **word count**; aim for 6–7 words.
+* A live **strength meter** shows the estimated entropy in bits (weak / fair / strong / excellent).
+* **Copy** places the result on the clipboard, with an `execCommand` fallback for mobile browsers that reject the async clipboard API.
 
 ---
 
@@ -196,8 +226,10 @@ Use B when the video tag is hidden, lazy-loaded, or you need an alternate qualit
 opera/
 ├── domain-css-injector-v2/      ← the extension (Manifest V3)
 │   ├── manifest.json            ← MV3 manifest with action + sidebar_action
-│   ├── popup.html               ← editor UI (popup on Chrome, sidebar on Opera)
-│   ├── popup.js                 ← editor logic, TTS, video extraction
+│   ├── popup.html               ← collapsible-section UI (popup on Chrome, sidebar on Opera)
+│   ├── popup.js                 ← editor logic, TTS, video extraction, snippets
+│   ├── popup-notepad.js         ← per-domain notepad
+│   ├── popup-password.js        ← crypto password / passphrase generator
 │   ├── content.js               ← injects CSS, runs the inspect-element overlay
 │   ├── background.js            ← service worker — context-menu video downloads
 │   └── icons/                   ← 16 / 48 / 128 px PNG icons
