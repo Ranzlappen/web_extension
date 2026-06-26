@@ -72,20 +72,34 @@ function loadHost(host) {
     chrome.storage.local.get([host], (res) => {
         document.getElementById('cssInput').value = res[host] || '';
     });
+    // Broadcast so decoupled modules (notepad) can reload their per-domain
+    // state without popup.js needing to know about them.
+    window.dispatchEvent(new CustomEvent('ps:hostchange', { detail: host }));
     reloadSnippets();
 }
+// Soft guard, not a parser. Confirms the input looks like CSS: at least one
+// `selector { ... }` block, and that plain rule blocks carry a declaration.
+// At-rules (@media/@keyframes/@font-face) nest braces, so their bodies are not
+// declaration-checked; and a single declaration without a trailing `;`
+// (e.g. `body{color:red}`) is accepted — both were wrongly rejected before.
 function validateCss(css) {
     css = css.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-    const blockRegex = /[^\{\}]+\{[^\{\}]*\}/;
+    const blockRegex = /[^\{\}]+\{[\s\S]*?\}/;
     if (!blockRegex.test(css)) {
         console.error('CSS does not contain any valid blocks.');
         return false;
     }
-    const propertyRegex = /([a-zA-Z-]+)\s*:\s*[^;]+;/;
-    const blocks = css.match(/\{([^\{\}]*)\}/g) || [];
-    for (let block of blocks) {
-        if (!propertyRegex.test(block)) {
-            console.error('Block contains invalid CSS properties:', block);
+    // Trailing semicolon optional; skip property checks for blocks whose
+    // selector starts with `@` (at-rules legitimately nest further braces).
+    const propertyRegex = /([a-zA-Z-]+)\s*:\s*[^;{}]+;?/;
+    const blockRe = /([^{}]*)\{([^{}]*)\}/g;
+    let m;
+    while ((m = blockRe.exec(css)) !== null) {
+        const selector = m[1].trim();
+        const body = m[2];
+        if (selector.startsWith('@')) continue;
+        if (body.trim() && !propertyRegex.test(body)) {
+            console.error('Block contains invalid CSS properties:', m[0]);
             return false;
         }
     }
@@ -110,10 +124,17 @@ function dropCss() {
         reloadSnippets();
     });
 }
+// Storage keys are bare domains holding CSS, EXCEPT internal keys namespaced
+// under the reserved `__ps_` prefix (notes, UI state). Those must never appear
+// as fake CSS snippets, so they're filtered out of the list here and out of
+// the Export payload below.
+function isReservedKey(k) {
+    return k.startsWith('__ps_');
+}
 function renderSnippets(items) {
     const list = document.getElementById('list');
     list.innerHTML = '';
-    const keys = Object.keys(items).sort();
+    const keys = Object.keys(items).filter((k) => !isReservedKey(k)).sort();
     if (!keys.length) {
         list.textContent = 'No saved snippets.';
         return;
@@ -320,18 +341,23 @@ async function pickAndSaveMedia() {
         showStatus(`Found ${mediaUrls.length} media source(s). Tap one to download.`, 3000);
     }
 }
-chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'TAB_CHANGED' && msg.domain && msg.domain !== activeHost) {
-        loadHost(msg.domain);
-    }
-});
+// React to tab switches/navigations instantly where the events fire; the
+// interval poll below stays as a low-frequency fallback for environments
+// (some mobile Chromium builds) where these events are unreliable.
+if (chrome.tabs && chrome.tabs.onActivated) {
+    chrome.tabs.onActivated.addListener(() => pollActiveTab());
+}
+if (chrome.tabs && chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener((_id, info, tab) => {
+        if (info.url && tab && tab.active) pollActiveTab();
+    });
+}
 document.addEventListener('DOMContentLoaded', async () => {
     const cssInput = document.getElementById('cssInput');
     const saveBtn = document.getElementById('saveBtn');
     const deleteBtn = document.getElementById('deleteBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const clearAllBtn = document.getElementById('clearAllBtn');
     const downloadVideoBtn = document.getElementById('downloadVideoBtn');
     const tab = await getActiveTab();
     if (tab && tab.url) {
@@ -347,14 +373,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
-            const data = JSON.stringify(items, null, 2);
+            // Export CSS snippets only — never the reserved `__ps_` keys, so
+            // private notes / UI state don't leak into a shared backup.
+            const snippets = {};
+            Object.keys(items).forEach((k) => {
+                if (!isReservedKey(k)) snippets[k] = items[k];
+            });
+            const data = JSON.stringify(snippets, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'pageside-snippets.json';
             a.click();
-            URL.revokeObjectURL(url);
+            // Defer revoke so slower mobile builds keep the blob URL alive
+            // long enough to start the download.
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
             showStatus('Exported JSON.');
         });
     });
@@ -428,4 +462,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-setInterval(pollActiveTab, 500);
+setInterval(pollActiveTab, 1000);

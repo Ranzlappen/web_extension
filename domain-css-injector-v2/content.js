@@ -25,6 +25,9 @@ if (!window.__ps_kx9w4_init) {
       });
       chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local' && changes[host]) {
+          // Skip re-injection when the value didn't actually change (e.g. an
+          // unrelated key was written in the same set() call).
+          if (changes[host].newValue === changes[host].oldValue) return;
           const oldNode = document.getElementById('__ps_kx9w4_style');
           if (oldNode) oldNode.remove();
           const nextNode = document.createElement('style');

@@ -3,20 +3,22 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <title>Pageside</title>
     <style>
         :root{color-scheme:dark;}
-        body{font-family: sans-serif;min-width:320px;max-width:100%;font-size: 20px;box-sizing:border-box;background-color: #0f121c;color:#e6e8ef;margin:0;padding:12px;}
+        body{font-family: sans-serif;min-width:300px;max-width:100%;font-size:16px;box-sizing:border-box;background-color: #0f121c;color:#e6e8ef;margin:0;
+            padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));}
+        @media (min-width:520px){body{font-size:18px;}}
         h3{margin:0 0 8px 0}
-		h4{margin:8px 0 8px 0}
-		textarea{width:100%;height:160px;box-sizing:border-box;font-family:monospace;background-color:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:6px;padding:8px;}
+        h4{margin:8px 0 8px 0}
+        textarea{width:100%;height:160px;box-sizing:border-box;font-family:monospace;background-color:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:6px;padding:8px;}
         button{background-color: black;color:#fff;border:1px solid #2a2f44;margin-top:8px;padding:10px 8px;width:100%;min-height:44px;border-radius:8px;}
-		button:hover{background-color:#313151;cursor:pointer;}
-        #list{margin-top:8px;overflow:auto;border:1px solid #2a2f44;padding:6px;border-radius:6px;}
+        button:hover{background-color:#313151;cursor:pointer;}
+        #list{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid #2a2f44;padding:6px;border-radius:6px;}
         #domainInfo{font-size:0.9em;color:#cfd2dc;margin-bottom:8px}
-		#status{min-height:22px;margin-top:8px;margin-bottom:8px;color:#cfd2dc;}
+        #status{min-height:22px;margin-top:8px;margin-bottom:8px;color:#cfd2dc;}
         .hint{font-size:0.8em;color:#9aa3b2;margin-bottom:8px}
         .small{font-size:0.8em;color:#9aa3b2;word-break:break-all}
         .kv{font-family:monospace;white-space:pre-wrap;padding:8px 0}
@@ -26,43 +28,109 @@
         #mediaList:empty{display:none}
         .media-item{display:block;text-align:left}
         .media-title{display:block;font-weight:bold}
+        /* Native collapsible sections — zero JS, keyboard-accessible, touch-friendly. */
+        .sec{border:1px solid #2a2f44;border-radius:10px;margin:8px 0;background:#11151f;overflow:hidden}
+        .sec>summary{list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;
+            padding:0 12px;cursor:pointer;font-weight:600;font-size:1.05em;user-select:none;-webkit-tap-highlight-color:transparent;}
+        .sec>summary::-webkit-details-marker{display:none}
+        .sec>summary::after{content:'▸';margin-left:auto;color:#9aa3b2;transition:transform .15s ease}
+        .sec[open]>summary::after{transform:rotate(90deg)}
+        .sec[open]>summary{border-bottom:1px solid #2a2f44}
+        .sec-body{padding:10px 12px 12px 12px}
+        .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#4aa3ff}
+        /* Password generator option rows */
+        .opt{display:flex;align-items:center;gap:8px;min-height:36px;font-size:0.95em}
+        .opt input[type="checkbox"]{width:20px;height:20px;margin:0;flex:0 0 auto}
+        .opt input[type="range"]{flex:1 1 auto;min-width:0}
+        #pwOut{display:block;font-family:monospace;word-break:break-all;background:#161a26;border:1px solid #2a2f44;border-radius:6px;padding:10px;min-height:24px}
+        #pwStrength{margin-top:6px}
+        .meter{height:6px;border-radius:3px;background:#2a2f44;margin-top:6px;overflow:hidden}
+        .meter>span{display:block;height:100%;width:0;background:#4aa3ff;transition:width .15s ease,background .15s ease}
     </style>
 </head>
 
 <body>
         <h3>Pageside</h3>
         <div id="domainInfo">Detecting site…</div>
-        <div class="hint">Enter custom CSS below</div>
-        <textarea id="cssInput" placeholder="Enter custom CSS for this site
+        <div id="status"></div>
+
+        <details class="sec" open>
+            <summary>Style</summary>
+            <div class="sec-body">
+                <div class="hint">Enter custom CSS below</div>
+                <textarea id="cssInput" placeholder="Enter custom CSS for this site
 
 .class  {style:example;}
 #id     {style:example;}
 body    {style:example;}
 *       {style:example;}"></textarea>
-        <div class="controls">
-            <button id="saveBtn">Save Style Changes</button>
-            <button id="deleteBtn">Delete Style for this Page</button>
-			<button id="inspectBtn">Select Container</button>
-        </div>
-        <div id="status"></div>
-		<h4>Read Aloud</h4>
-		<div class="controls">
-			<button id="readTextBtn">Read Selected Text</button>
-			<button id="stopReadBtn">Stop Reading</button>
-        </div>
-		<h4>Media</h4>
-		<div class="controls">
-			<button id="downloadVideoBtn">Download Video Media</button>
-		</div>
-		<div id="mediaList"></div>
-		<div class="hint">Tip: on desktop you can also right-click a video and choose "Download this video".</div>
-        <h4>Saved snippets</h4>
-        <div class="controls">
-            <button id="refreshBtn">Refresh list</button>
-            <button id="exportBtn">Export JSON</button>
-        </div>
-        <div id="list"></div>
+                <div class="controls">
+                    <button id="saveBtn">Save Style Changes</button>
+                    <button id="deleteBtn">Delete Style for this Page</button>
+                    <button id="inspectBtn">Select Container</button>
+                </div>
+            </div>
+        </details>
+
+        <details class="sec">
+            <summary>Notes <span id="notesDot" class="dot" hidden></span></summary>
+            <div class="sec-body">
+                <div class="hint">Private notes for <span id="notesDomain">this site</span> — saved locally, per domain.</div>
+                <textarea id="noteInput" placeholder="Jot anything for this site… auto-saves as you type."></textarea>
+                <div class="controls">
+                    <button id="noteSave">Save note</button>
+                    <button id="noteClear">Clear note</button>
+                </div>
+            </div>
+        </details>
+
+        <details class="sec">
+            <summary>Password</summary>
+            <div class="sec-body">
+                <output id="pwOut" aria-live="polite">Tap Generate</output>
+                <div id="pwStrength" class="small">&nbsp;</div>
+                <div class="meter"><span id="pwMeter"></span></div>
+                <div class="controls">
+                    <button id="pwGen">Generate</button>
+                    <button id="pwCopy">Copy</button>
+                </div>
+                <label class="opt"><span style="flex:0 0 auto"><span id="pwLenLabel">Length: </span><span id="pwLenVal">20</span></span><input id="pwLen" type="range" min="4" max="64" value="20"></label>
+                <label class="opt"><input type="checkbox" id="pwLower" checked> lowercase (a–z)</label>
+                <label class="opt"><input type="checkbox" id="pwUpper" checked> uppercase (A–Z)</label>
+                <label class="opt"><input type="checkbox" id="pwDigit" checked> digits (0–9)</label>
+                <label class="opt"><input type="checkbox" id="pwSym" checked> symbols (!@#…)</label>
+                <label class="opt"><input type="checkbox" id="pwNoAmbig"> exclude ambiguous (0 O 1 l I)</label>
+                <label class="opt"><input type="checkbox" id="pwEach" checked> require each selected set</label>
+                <label class="opt"><input type="checkbox" id="pwPass"> passphrase mode (words)</label>
+                <div class="hint">Generated with the browser's cryptographic RNG. Nothing is stored — copy it before closing.</div>
+            </div>
+        </details>
+
+        <details class="sec">
+            <summary>Tools</summary>
+            <div class="sec-body">
+                <h4>Read Aloud</h4>
+                <div class="controls">
+                    <button id="readTextBtn">Read Selected Text</button>
+                    <button id="stopReadBtn">Stop Reading</button>
+                </div>
+                <h4>Media</h4>
+                <div class="controls">
+                    <button id="downloadVideoBtn">Download Video Media</button>
+                </div>
+                <div id="mediaList"></div>
+                <div class="hint">Tip: on desktop you can also right-click a video and choose "Download this video".</div>
+                <h4>Saved snippets</h4>
+                <div class="controls">
+                    <button id="refreshBtn">Refresh list</button>
+                    <button id="exportBtn">Export JSON</button>
+                </div>
+                <div id="list"></div>
+            </div>
+        </details>
     <script src="popup.js"></script>
+    <script src="popup-notepad.js"></script>
+    <script src="popup-password.js"></script>
 </body>
 
 </html>

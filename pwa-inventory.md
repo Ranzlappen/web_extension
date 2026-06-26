@@ -13,6 +13,16 @@ This inventory captures every key, path, and identifier whose value is part of t
 | Key shape | Source of value | Type | Notes |
 | --- | --- | --- | --- |
 | `<base-domain>` (e.g. `example.com`) | `resolveBaseHost(window.location.hostname)` in `popup.js` and `content.js` (renamed from `getBaseDomain` in the obfuscation pass — same algorithm) | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
+| `__ps_notes` | `popup-notepad.js` | `object` (`{ "<base-domain>": "<note>" }`) | Per-domain private notepad. A single map keyed by base domain. Empty notes are pruned from the map. |
+
+### Reserved `__ps_` prefix
+
+All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Two invariants protect this:
+
+* `renderSnippets()` in `popup.js` filters out any key matching `isReservedKey(k)` (`k.startsWith('__ps_')`) so internal keys never appear as fake CSS snippets.
+* **Export JSON** strips the same prefix so private notes never leak into a shared snippet backup.
+
+Any future internal key (UI state, settings, etc.) **must** use this prefix and inherit both exclusions.
 
 Read sites:
 
@@ -138,6 +148,8 @@ Two surfaces, one HTML file:
 * `sidebar_action.default_panel` → `popup.html` — the sidebar panel on Opera / Firefox
 
 Both surfaces must continue to render `popup.html` correctly. The styles in `popup.html` are intentionally width-agnostic so the same file works as a fixed Chrome popup and as a flexible Opera sidebar.
+
+`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads three classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus`), then `popup-notepad.js` and `popup-password.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-notepad.js` listens for it to reload the per-domain note.
 
 ---
 
