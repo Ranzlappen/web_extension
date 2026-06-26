@@ -64,16 +64,56 @@ Phone browsers install from a single archive, not a folder. Either:
 
 Transfer the `.zip` to your phone (USB, Google Drive, email to yourself, etc.) and remember its path — you'll need it for every step below.
 
-### Kiwi Browser (Chromium, Android — recommended)
+### Kiwi Browser (Chromium, Android — recommended) — foolproof guide
 
-Kiwi is the most popular Chromium fork on Android with full extension support. It loads unpacked Manifest V2 and V3 extensions directly from a `.zip`.
+Kiwi is the most popular Chromium fork on Android with full extension support. It loads unpacked Manifest V2 and V3 extensions directly from a `.zip`. Follow these steps exactly — they assume you have never sideloaded an extension before.
 
-1. Install **Kiwi Browser** from the Play Store.
-2. Open Kiwi → tap the **⋮** menu → **Extensions**.
-3. Toggle **Developer mode** on (top-right of the Extensions page).
-4. Tap **+ (from .zip / .crx / .user.js)** and pick the `pageside-<version>.zip` you saved.
-5. Confirm the permissions prompt. The extension will appear in the list.
-6. Tap **⋮** → **Pageside** any time to open the popup. The toolbar / sidebar surface depends on the Kiwi build; the popup works the same as on desktop.
+#### Step 0 — What you need first
+
+* An Android phone with **Kiwi Browser** installed (Play Store → search "Kiwi Browser" → **Install**).
+* The **`pageside-<version>.zip`** file saved somewhere on the phone (your **Downloads** folder is easiest). If you don't have it yet, see [Get the `.zip` onto your phone](#get-the-zip-onto-your-phone) just below.
+
+> ⚠️ **The single most common mistake:** the `manifest.json` file **must sit at the very top (root) of the zip**, *not* inside a `domain-css-injector-v2/` folder. If after installing you get "Manifest file is missing or unreadable", your zip is nested one folder too deep — rebuild it (see the note at the end of this section).
+
+#### Get the `.zip` onto your phone
+
+Pick whichever is easiest for you:
+
+* **From Releases (no computer needed):** open this repo's [Releases](../../releases) page in any browser on the phone, tap the `pageside-<version>.zip` asset, and let it download. It lands in **Downloads**.
+* **From a computer:** download or build the zip on your computer (`cd domain-css-injector-v2 && zip -r ../pageside.zip .`), then move it to the phone via USB cable, Google Drive, or by emailing it to yourself and saving the attachment.
+* **Build it on the phone:** install a file-manager app with a "compress / create zip" action (e.g. ZArchiver), open the `domain-css-injector-v2` folder, **select all of its contents** (not the folder itself), and compress them into `pageside.zip`.
+
+After this step you should be able to find the `.zip` in your **Files / Downloads** app.
+
+#### Step-by-step install in Kiwi
+
+1. Open **Kiwi Browser**.
+2. In the address bar type **`kiwi://extensions`** and go (or tap the **⋮** menu → **Extensions**).
+3. On the Extensions page, turn **Developer mode** **ON** — the toggle is in the **top-right** corner. New buttons appear once it's on.
+4. Tap **`+ (from .zip/.crx/.user.js)`**.
+5. Your file picker opens. Navigate to **Downloads** (or wherever you saved it) and tap **`pageside-<version>.zip`**.
+6. Kiwi shows a permissions prompt listing what the extension can do (read/change site data, downloads, clipboard). Tap **OK / Add extension** to confirm.
+7. **Pageside** now appears in the Extensions list with a toggle that should be **ON** (enabled).
+
+#### Step-by-step: open and use it
+
+1. Tap the **⋮** menu. Scroll the menu — installed extensions are listed near the bottom. Tap **Pageside**.
+2. The popup opens. The **"Detected site"** label at the top should show the base domain of the page you're on (e.g. `example.com`).
+3. Tap a section header (**Style**, **Notes**, **Password**, **Tools**) to expand it — they're collapsible to fit a phone screen.
+4. Quick smoke test: expand **Style**, type `body { background:#102030; }`, tap **Save Style Changes**, and the page background should change immediately.
+
+> 💡 **Tip:** Kiwi can pin frequently-used extensions to the toolbar. Long-press the **Pageside** entry in the **⋮** menu (or use its options) to pin it so it's one tap away. The exact pinning UI varies by Kiwi build; the **⋮ → Pageside** path always works.
+
+#### If something goes wrong
+
+| Symptom | Cause & fix |
+| --- | --- |
+| "Manifest file is missing or unreadable" | The zip is nested. The `manifest.json` must be at the **root** of the archive, not inside a `domain-css-injector-v2/` sub-folder. Rebuild by zipping the **contents** of `domain-css-injector-v2/`, not the folder. |
+| `+ (from .zip/.crx…)` button isn't shown | **Developer mode** isn't on. Toggle it ON (top-right of `kiwi://extensions`) and the button appears. |
+| File picker won't show the `.zip` | It downloaded somewhere unexpected, or as `pageside.zip.bin`. Check your **Downloads**, and rename it to end in `.zip` if needed. |
+| **Pageside** isn't in the **⋮** menu after install | Make sure its toggle is **ON** in `kiwi://extensions`, then fully close and reopen the menu. |
+| Popup opens but "Detected site" says *No active tab* | Open the popup **while a normal web page is in front** (not the new-tab page or `kiwi://` pages — extensions can't run on those). |
+| Styles don't apply | Re-open the popup on the target site and re-save; confirm the **base domain** shown matches the site. Some `kiwi://`/Play-Store pages are off-limits to all extensions. |
 
 ### Yandex Browser (Android)
 
