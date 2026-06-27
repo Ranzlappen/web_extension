@@ -14,10 +14,11 @@ This inventory captures every key, path, and identifier whose value is part of t
 | --- | --- | --- | --- |
 | `<base-domain>` (e.g. `example.com`) | `resolveBaseHost(window.location.hostname)` in `popup.js` and `content.js` (renamed from `getBaseDomain` in the obfuscation pass — same algorithm) | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
 | `__ps_notes` | `popup-notepad.js` | `object` (`{ "<base-domain>": "<note>" }`) | Per-domain private notepad. A single map keyed by base domain. Empty notes are pruned from the map. |
+| `__ps_lasthost` | `content.js` | `string` (base domain) | The foreground page's base host, written by the content script while the tab is visible. The popup reads it as a fallback for active-site detection when `chrome.tabs.query` is unreliable (Kiwi / Android forks). |
 
 ### Reserved `__ps_` prefix
 
-All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Two invariants protect this:
+All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Two invariants protect this:
 
 * `renderSnippets()` in `popup.js` filters out any key matching `isReservedKey(k)` (`k.startsWith('__ps_')`) so internal keys never appear as fake CSS snippets.
 * **Export JSON** strips the same prefix so private notes never leak into a shared snippet backup.

@@ -40,6 +40,22 @@ if (!window.__ps_kx9w4_init) {
   })();
 
   if (window.top === window.self) {
+    // Record this page's base host while it's the foreground tab. The popup
+    // reads `__ps_lasthost` as a fallback when chrome.tabs.query is unreliable
+    // (Kiwi / Android forks), so the site is still detected. Guard on
+    // visibility so background tab loads can't hijack the recorded host.
+    function recordLastHost() {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const h = resolveBaseHost(window.location.hostname);
+        if (h) chrome.storage.local.set({ __ps_lasthost: h });
+      } catch (_) { /* ignore (e.g. about:blank, extension errors) */ }
+    }
+    recordLastHost();
+    document.addEventListener('visibilitychange', recordLastHost);
+    window.addEventListener('pageshow', recordLastHost);
+    window.addEventListener('focus', recordLastHost);
+
     let pickerActive = false;
     let pickerFrame = null;
     let pickerLabel = null;

@@ -121,6 +121,7 @@ After this step you should be able to find the `.zip` in your **Files / Download
 | File picker won't show the `.zip` | It downloaded somewhere unexpected, or as `pageside.zip.bin`. Check your **Downloads**, and rename it to end in `.zip` if needed. |
 | **Pageside** isn't in the **⋮** menu after install | Make sure its toggle is **ON** in `kiwi://extensions`, then fully close and reopen the menu. |
 | Popup opens but "Detected site" says *No active tab* | Open the popup **while a normal web page is in front** (not the new-tab page or `kiwi://` pages — extensions can't run on those). |
+| Popup is stuck on *"Detecting site…"* | Kiwi occasionally doesn't answer the active-tab query. The popup now retries and falls back to the page's own recorded host, then shows **"Could not detect the site — tap to retry."** — tap it to try again. Reopening the popup on the page also fixes it. |
 | Styles don't apply | Re-open the popup on the target site and re-save; confirm the **base domain** shown matches the site. Some `kiwi://`/Play-Store pages are off-limits to all extensions. |
 
 ### Yandex Browser (Android)
