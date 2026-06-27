@@ -57,9 +57,31 @@ function resolveBaseHost(hostname) {
     const parts = hostname.split('.').reverse();
     return parts.length > 2 ? `${parts[1]}.${parts[0]}` : hostname;
 }
+// chrome.tabs.query is promise-based on MV3 Chrome, but several mobile
+// Chromium forks (Kiwi, older builds) ship the callback-only signature and
+// throw synchronously when called WITHOUT a callback — which would reject the
+// await below and leave the popup stuck on "Detecting site…". Passing a
+// callback is accepted by both forms, so we always use the callback and wrap
+// the result in a never-rejecting promise.
+function queryTabs(query) {
+    return new Promise((resolve) => {
+        try {
+            chrome.tabs.query(query, (tabs) => {
+                void (chrome.runtime && chrome.runtime.lastError); // swallow, treat as empty
+                resolve(tabs || []);
+            });
+        } catch (_) {
+            resolve([]);
+        }
+    });
+}
 async function getActiveTab() {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tabs && tabs[0];
+    // Some forks don't match the popup's own window with currentWindow, so fall
+    // back to lastFocusedWindow and finally an unscoped active-tab query.
+    let tabs = await queryTabs({ active: true, currentWindow: true });
+    if (!tabs.length) tabs = await queryTabs({ active: true, lastFocusedWindow: true });
+    if (!tabs.length) tabs = await queryTabs({ active: true });
+    return tabs[0];
 }
 function showStatus(text, timeout = 2000) {
     const statusEl = document.getElementById('status');
@@ -163,10 +185,12 @@ function reloadSnippets() {
     chrome.storage.local.get(null, renderSnippets);
 }
 async function pollActiveTab() {
-    const tab = await getActiveTab();
-    if (!tab || !tab.url) return;
-    const host = resolveBaseHost(new URL(tab.url).hostname);
-    if (host !== activeHost) loadHost(host);
+    try {
+        const tab = await getActiveTab();
+        if (!tab || !tab.url) return;
+        const host = resolveBaseHost(new URL(tab.url).hostname);
+        if (host !== activeHost) loadHost(host);
+    } catch (_) { /* leave current state intact */ }
 }
 
 async function collectMediaSources() {
@@ -359,10 +383,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
     const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-    const tab = await getActiveTab();
-    if (tab && tab.url) {
-        loadHost(resolveBaseHost(new URL(tab.url).hostname));
-    } else {
+    try {
+        const tab = await getActiveTab();
+        if (tab && tab.url) {
+            loadHost(resolveBaseHost(new URL(tab.url).hostname));
+        } else {
+            document.getElementById('domainInfo').textContent = 'No active tab detected.';
+        }
+    } catch (_) {
         document.getElementById('domainInfo').textContent = 'No active tab detected.';
     }
     saveBtn.addEventListener('click', () => persistCss(cssInput.value));
@@ -420,38 +448,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const inspectBtn = document.getElementById('inspectBtn');
   if (inspectBtn) {
-    inspectBtn.addEventListener('click', () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) startPick(tabs[0].id);
-      });
+    inspectBtn.addEventListener('click', async () => {
+      const tab = await getActiveTab();
+      if (tab && tab.id) startPick(tab.id);
+      else showStatus('No active tab detected.', 2500);
     });
   }
   const readTextBtn = document.getElementById('readTextBtn');
   if (readTextBtn) {
-    readTextBtn.addEventListener('click', () => {
+    readTextBtn.addEventListener('click', async () => {
       // Ask the content script for the selected text
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.scripting.executeScript(
-            {
-              target: { tabId: tabs[0].id },
-              func: () => window.getSelection().toString()
-            },
-            (results) => {
-              if (chrome.runtime.lastError) {
-                showStatus(`Cannot read this page: ${chrome.runtime.lastError.message}`, 3000);
-                return;
-              }
-              const selectedText = results && results[0] && results[0].result;
-              if (selectedText && selectedText.trim() !== '') {
-                speak(selectedText);
-              } else {
-                showStatus('No text selected on the page.', 2500);
-              }
-            }
-          );
+      const tab = await getActiveTab();
+      if (!tab || !tab.id) {
+        showStatus('No active tab detected.', 2500);
+        return;
+      }
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tab.id },
+          func: () => window.getSelection().toString()
+        },
+        (results) => {
+          if (chrome.runtime.lastError) {
+            showStatus(`Cannot read this page: ${chrome.runtime.lastError.message}`, 3000);
+            return;
+          }
+          const selectedText = results && results[0] && results[0].result;
+          if (selectedText && selectedText.trim() !== '') {
+            speak(selectedText);
+          } else {
+            showStatus('No text selected on the page.', 2500);
+          }
         }
-      });
+      );
     });
   }
   const stopReadBtn = document.getElementById('stopReadBtn');
