@@ -122,7 +122,8 @@ Declared in `manifest.json` (granted at install time):
 * `storage` — for `chrome.storage.local` reads/writes
 * `activeTab` — to read the active tab's URL when the popup opens
 * `scripting` — to run the video-source scanner via `chrome.scripting.executeScript`
-* `tabs` — to query / message the active tab from the popup
+* `tabs` — to query / message the active tab from the popup, and to sort / dedupe / list / focus tabs across windows in the **Tabs** organizer
+* `tabGroups` — used by the **Tabs** organizer's _Group by domain_ action (`chrome.tabs.group` / `chrome.tabGroups`). Chrome/Edge desktop only; feature-detected at runtime and **dropped from the MV2 (Kiwi) build** (no tab-groups API there)
 * `clipboardWrite` — used by the inspect-element overlay to copy a selector
 * `downloads` — to hand a media URL to `chrome.downloads.download`
 * `contextMenus` — used by `background.js` to register the right-click **Download this video** entry on `<video>` elements
@@ -160,14 +161,14 @@ A second distributable, `pageside-<version>-kiwi.zip`, ships a **Manifest V2** m
 | `action` (popup) | `browser_action` (same `default_popup`/icons) |
 | `background.service_worker` | `background.scripts` + `"persistent": false` (event page) |
 | `host_permissions: ["<all_urls>"]` | folded into `permissions` |
-| `permissions: [… "scripting" …]` | `scripting` dropped (MV3-only API) |
+| `permissions: [… "scripting" … "tabGroups" …]` | `scripting` and `tabGroups` dropped (MV3/desktop-only; Kiwi has no tab-groups API) |
 | `sidebar_action`, `browser_specific_settings` | dropped (no sidebar on Kiwi; gecko key is Firefox-only) |
 
 The same `popup.js` / `content.js` / `background.js` run under both. `popup.js` routes all page injection through `injectFunc()` / `injectFile()`, which use `chrome.scripting` on MV3 and fall back to `chrome.tabs.executeScript` on MV2. CI asserts the derived MV2 manifest stays in version/name parity with `manifest.json`.
 
 ### UI surface
 
-`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads three classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus`), then `popup-notepad.js` and `popup-password.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-notepad.js` listens for it to reload the per-domain note.
+`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools / Tabs) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads four classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus` / `resolveBaseHost`), then `popup-notepad.js`, `popup-password.js`, and `popup-tabs.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-notepad.js` listens for it to reload the per-domain note and `popup-tabs.js` to refresh its tab list. `popup-tabs.js` persists **nothing** (it acts on live tabs), so it adds no storage key.
 
 ---
 

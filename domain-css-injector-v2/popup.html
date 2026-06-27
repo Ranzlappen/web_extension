@@ -46,6 +46,14 @@
         #pwStrength{margin-top:6px}
         .meter{height:6px;border-radius:3px;background:#2a2f44;margin-top:6px;overflow:hidden}
         .meter>span{display:block;height:100%;width:0;background:#4aa3ff;transition:width .15s ease,background .15s ease}
+        /* Tab organizer */
+        #tabsSort{width:100%;min-height:44px;background:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:8px;padding:8px;margin-bottom:8px;}
+        #tabsFilter{width:100%;box-sizing:border-box;min-height:44px;background:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:8px;padding:8px;margin-top:8px;}
+        #tabsList{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid #2a2f44;padding:6px;border-radius:6px;}
+        #tabsList:empty{display:none}
+        .tab-row{display:flex;gap:6px;align-items:stretch;margin:4px 0}
+        .tab-open{flex:1 1 auto;width:auto;margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .tab-close{flex:0 0 44px;width:44px;margin:0;}
     </style>
 </head>
 
@@ -131,9 +139,30 @@ body    {style:example;}
                 <div id="list"></div>
             </div>
         </details>
+
+        <details class="sec" id="tabsSection">
+            <summary>Tabs</summary>
+            <div class="sec-body">
+                <div class="hint">Organize every open tab across all your windows.</div>
+                <label class="small" for="tabsSort">Sort order</label>
+                <select id="tabsSort">
+                    <option value="domain">By domain</option>
+                    <option value="title">By title</option>
+                    <option value="url">By URL</option>
+                </select>
+                <div class="controls">
+                    <button id="tabsSortBtn">Sort tabs</button>
+                    <button id="tabsGroupBtn">Group by domain</button>
+                    <button id="tabsDedupeBtn">Close duplicates</button>
+                </div>
+                <input id="tabsFilter" type="text" placeholder="Filter open tabs…">
+                <div id="tabsList"></div>
+            </div>
+        </details>
     <script src="popup.js"></script>
     <script src="popup-notepad.js"></script>
     <script src="popup-password.js"></script>
+    <script src="popup-tabs.js"></script>
 </body>
 
 </html>

@@ -18,9 +18,11 @@ import { readFileSync } from 'node:fs';
 const src = process.argv[2] || 'domain-css-injector-v2/manifest.json';
 const m = JSON.parse(readFileSync(src, 'utf8'));
 
-// host_permissions (MV3) fold into permissions (MV2); 'scripting' is MV3-only.
+// host_permissions (MV3) fold into permissions (MV2); 'scripting' and
+// 'tabGroups' are MV3/desktop-only (Kiwi has no tab-groups API and warns on the
+// unknown permission), so they are dropped from the MV2 build.
 const permissions = [
-  ...(m.permissions || []).filter((p) => p !== 'scripting'),
+  ...(m.permissions || []).filter((p) => p !== 'scripting' && p !== 'tabGroups'),
   ...(m.host_permissions || [])
 ];
 

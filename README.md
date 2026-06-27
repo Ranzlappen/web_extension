@@ -8,9 +8,9 @@
 
 ## What this is
 
-A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, a Web-Speech TTS reader for selected text, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, a **per-domain notepad** for private site notes, and a **cryptographic password / passphrase generator**.
+A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, a Web-Speech TTS reader for selected text, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, a **per-domain notepad** for private site notes, a **cryptographic password / passphrase generator**, and a **tab organizer** that sorts, groups by domain, de-duplicates, and lists your open tabs across every window.
 
-The UI is organized into collapsible sections (Style / Notes / Password / Tools) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
+The UI is organized into collapsible sections (Style / Notes / Password / Tools / Tabs) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
 
 Everything is stored locally via `chrome.storage.local` — there is no server, no account, and no telemetry. Generated passwords are never stored.
 
@@ -32,6 +32,7 @@ The most common tasks. For anything not listed, see [Developer Setup](#developer
 | Download a `<video>` from a page | Either right-click the video on the page and choose **Download this video**, or open the editor and click **Download Video Media**. |
 | Keep a private note for a site | Open the **Notes** section, type — it auto-saves per domain (or tap **Save note**). |
 | Generate a strong password | Open the **Password** section, set the options, tap **Generate**, then **Copy**. |
+| Organize / sort open tabs | Open the **Tabs** section, pick a sort order and tap **Sort tabs**, **Group by domain** (Chrome desktop), or **Close duplicates**. Filter the list and click a tab to jump to it. |
 | Back up all snippets | Open the editor, click **Export JSON**. (Private notes are never included in the export.) |
 | Restore a snippet on another browser | Open the editor on the target site, paste the JSON value into the editor, **Save**. |
 
@@ -106,7 +107,7 @@ After this step you should be able to find the `.zip` in your **Files / Download
 
 1. Tap the **⋮** menu. Scroll the menu — installed extensions are listed near the bottom. Tap **Pageside**.
 2. The popup opens. The **"Detected site"** label at the top should show the base domain of the page you're on (e.g. `example.com`).
-3. Tap a section header (**Style**, **Notes**, **Password**, **Tools**) to expand it — they're collapsible to fit a phone screen.
+3. Tap a section header (**Style**, **Notes**, **Password**, **Tools**, **Tabs**) to expand it — they're collapsible to fit a phone screen.
 4. Quick smoke test: expand **Style**, type `body { background:#102030; }`, tap **Save Style Changes**, and the page background should change immediately.
 
 > 💡 **Tip:** Kiwi can pin frequently-used extensions to the toolbar. Long-press the **Pageside** entry in the **⋮** menu (or use its options) to pin it so it's one tap away. The exact pinning UI varies by Kiwi build; the **⋮ → Pageside** path always works.
@@ -269,6 +270,17 @@ The **Password** section generates strong secrets using the browser's cryptograp
 
 ---
 
+## Tab organizer
+
+The **Tabs** section operates on every open tab across all your windows. It stores nothing — each action runs against the live tabs.
+
+* **Sort tabs** reorders the tabs in each window by the chosen key — **domain**, **title**, or **URL**. Pinned tabs stay put; only the movable tabs are reordered.
+* **Group by domain** collects same-domain tabs into native browser tab groups (one labelled group per domain, per window). This uses `chrome.tabGroups` and is **Chrome / Edge desktop only** — the button hides itself on Firefox, Opera, and the Kiwi/Android build, where the API doesn't exist.
+* **Close duplicates** closes any tab whose URL exactly matches an earlier open tab, keeping the first. Pinned tabs are never closed.
+* The **filter box** narrows the live tab list; click a row to jump to that tab (and focus its window), or tap **✕** to close it.
+
+---
+
 ## Project Structure
 
 ```
@@ -279,6 +291,7 @@ opera/
 │   ├── popup.js                 ← editor logic, TTS, video extraction, snippets
 │   ├── popup-notepad.js         ← per-domain notepad
 │   ├── popup-password.js        ← crypto password / passphrase generator
+│   ├── popup-tabs.js            ← tab organizer (sort / group / dedupe / list)
 │   ├── content.js               ← injects CSS, runs the inspect-element overlay
 │   ├── background.js            ← service worker — context-menu video downloads
 │   └── icons/                   ← 16 / 48 / 128 px PNG icons
