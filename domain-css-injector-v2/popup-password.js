@@ -6,14 +6,23 @@
 (function () {
   // --- Cryptographic randomness ------------------------------------------
   // Uniform integer in [0, max) via rejection sampling. A plain
-  // getRandomValues % max skews toward low values when 256 % max !== 0; we
-  // discard bytes in the biased tail so every index is equally likely.
+  // getRandomValues % max skews toward low values when range % max !== 0; we
+  // discard values in the biased tail so every index is equally likely.
+  // Draws as many bytes as max needs — a single byte only covers max <= 256,
+  // so larger pools (e.g. the Chinese set pushes the pool past 256) would make
+  // a one-byte limit collapse to 0 and loop forever.
   function randIndex(max) {
-    if (max <= 0) return 0;
-    const limit = 256 - (256 % max); // largest multiple of max <= 256
-    const buf = new Uint8Array(1);
+    if (max <= 1) return 0;
+    const bytes = Math.ceil(Math.log2(max) / 8);
+    const range = Math.pow(256, bytes);
+    const limit = range - (range % max); // largest multiple of max <= range
+    const buf = new Uint8Array(bytes);
     let x;
-    do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+    do {
+      crypto.getRandomValues(buf);
+      x = 0;
+      for (let i = 0; i < bytes; i++) x = x * 256 + buf[i];
+    } while (x >= limit);
     return x % max;
   }
   function pickFrom(str) { return str[randIndex(str.length)]; }
@@ -23,14 +32,20 @@
     lower: 'abcdefghijklmnopqrstuvwxyz',
     upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
     digit: '0123456789',
-    sym: '!@#$%^&*()-_=+[]{};:,.<>?'
+    sym: '!@#$%^&*()-_=+[]{};:,.<>?',
+    // Russian Cyrillic alphabet, lower + upper.
+    cyrillic: 'абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ',
+    // Greek alphabet, lower + upper (final sigma included).
+    greek: 'αβγδεζηθικλμνξοπρστυφχψωςΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ',
+    // Common Chinese characters (all BMP, safe for string indexing).
+    chinese: '的一是不了人我在有他这中大来上国个到说们为子和你地出道也时年得就那要下以生会自着去之过家学对可她里后小么心多天而能好都然没日于起还发成事只作当想看文无开手十用主行方又如前所本见经头面公同三已老从动两长知民样现分将外但身些与高意进把法此实回二理美点'
   };
   const AMBIG = /[0O1lI]/g;
 
   function buildPool(opts) {
     let pool = '';
     const req = [];
-    for (const k of ['lower', 'upper', 'digit', 'sym']) {
+    for (const k of ['lower', 'upper', 'digit', 'sym', 'cyrillic', 'greek', 'chinese']) {
       if (opts[k]) {
         let s = SETS[k];
         if (opts.noAmbig) s = s.replace(AMBIG, '');
@@ -137,6 +152,9 @@
       upper: $('pwUpper').checked,
       digit: $('pwDigit').checked,
       sym: $('pwSym').checked,
+      cyrillic: $('pwCyrillic').checked,
+      greek: $('pwGreek').checked,
+      chinese: $('pwChinese').checked,
       noAmbig: $('pwNoAmbig').checked,
       requireEach: $('pwEach').checked,
       passphrase: $('pwPass').checked,
@@ -211,7 +229,7 @@
       updateLabel();
       renderStrength(readOpts());
     });
-    ['pwLower', 'pwUpper', 'pwDigit', 'pwSym', 'pwNoAmbig', 'pwEach'].forEach((id) => {
+    ['pwLower', 'pwUpper', 'pwDigit', 'pwSym', 'pwCyrillic', 'pwGreek', 'pwChinese', 'pwNoAmbig', 'pwEach'].forEach((id) => {
       $(id).addEventListener('change', () => renderStrength(readOpts()));
     });
     $('pwPass').addEventListener('change', () => { syncSliderMode(); renderStrength(readOpts()); });
