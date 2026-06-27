@@ -57,21 +57,28 @@ Pageside is a standard Chromium / WebExtensions add-on, so any phone browser tha
 
 ### Build a `.zip` of the extension first
 
-Phone browsers install from a single archive, not a folder. Either:
+Phone browsers install from a single archive, not a folder.
 
-* Download the latest `pageside-<version>.zip` from this repo's [Releases](../../releases) page (every tagged release attaches one), **or**
-* Build it yourself: zip the contents of `domain-css-injector-v2/` (not the folder itself — the `manifest.json` must sit at the root of the archive). On a phone you can do this with any file-manager app that has a "compress" action; on a desktop, run `cd domain-css-injector-v2 && zip -r ../pageside.zip .`.
+> ⚠️ **Kiwi and most Android Chromium forks need the Manifest V2 build.** Kiwi's Manifest V3 support is experimental and it will **silently do nothing** when you try to load the standard (MV3) zip. Use the **`-kiwi.zip`** (Manifest V2) for Kiwi / Yandex / Mises / Lemur. The plain `pageside-<version>.zip` is the MV3 build for desktop Chrome / Edge / Opera / Firefox. Both contain the same features — only the manifest differs.
+
+Get the right archive:
+
+* **From Releases (recommended):** open this repo's [Releases](../../releases) page; every tagged release attaches **both** `pageside-<version>.zip` (desktop, MV3) and `pageside-<version>-kiwi.zip` (mobile, MV2). Download the `-kiwi.zip` for an Android Chromium browser.
+* **Build the Kiwi (MV2) zip yourself:** on a desktop with Node + `zip`, run `tools/build-kiwi-zip.sh` from the repo root — it derives the MV2 manifest and produces `dist/pageside-<version>-kiwi.zip` with `manifest.json` at the root.
+* **Build the desktop (MV3) zip yourself:** `cd domain-css-injector-v2 && zip -r ../pageside.zip .` (zip the *contents*, not the folder — `manifest.json` must sit at the archive root).
 
 Transfer the `.zip` to your phone (USB, Google Drive, email to yourself, etc.) and remember its path — you'll need it for every step below.
 
 ### Kiwi Browser (Chromium, Android — recommended) — foolproof guide
 
-Kiwi is the most popular Chromium fork on Android with full extension support. It loads unpacked Manifest V2 and V3 extensions directly from a `.zip`. Follow these steps exactly — they assume you have never sideloaded an extension before.
+Kiwi is the most popular Chromium fork on Android with extension support. It loads unpacked extensions directly from a `.zip`. Follow these steps exactly — they assume you have never sideloaded an extension before.
+
+> ⚠️ **Use the `-kiwi.zip` (Manifest V2) build.** Kiwi's MV3 support is experimental and silently fails to load the standard MV3 zip — that's the usual cause of "nothing happens." The `pageside-<version>-kiwi.zip` is built for Kiwi.
 
 #### Step 0 — What you need first
 
 * An Android phone with **Kiwi Browser** installed (Play Store → search "Kiwi Browser" → **Install**).
-* The **`pageside-<version>.zip`** file saved somewhere on the phone (your **Downloads** folder is easiest). If you don't have it yet, see [Get the `.zip` onto your phone](#get-the-zip-onto-your-phone) just below.
+* The **`pageside-<version>-kiwi.zip`** file saved somewhere on the phone (your **Downloads** folder is easiest). If you don't have it yet, see [Get the `.zip` onto your phone](#get-the-zip-onto-your-phone) just below.
 
 > ⚠️ **The single most common mistake:** the `manifest.json` file **must sit at the very top (root) of the zip**, *not* inside a `domain-css-injector-v2/` folder. If after installing you get "Manifest file is missing or unreadable", your zip is nested one folder too deep — rebuild it (see the note at the end of this section).
 
@@ -91,7 +98,7 @@ After this step you should be able to find the `.zip` in your **Files / Download
 2. In the address bar type **`kiwi://extensions`** and go (or tap the **⋮** menu → **Extensions**).
 3. On the Extensions page, turn **Developer mode** **ON** — the toggle is in the **top-right** corner. New buttons appear once it's on.
 4. Tap **`+ (from .zip/.crx/.user.js)`**.
-5. Your file picker opens. Navigate to **Downloads** (or wherever you saved it) and tap **`pageside-<version>.zip`**.
+5. Your file picker opens. Navigate to **Downloads** (or wherever you saved it) and tap **`pageside-<version>-kiwi.zip`** (the Manifest V2 build).
 6. Kiwi shows a permissions prompt listing what the extension can do (read/change site data, downloads, clipboard). Tap **OK / Add extension** to confirm.
 7. **Pageside** now appears in the Extensions list with a toggle that should be **ON** (enabled).
 
@@ -108,7 +115,8 @@ After this step you should be able to find the `.zip` in your **Files / Download
 
 | Symptom | Cause & fix |
 | --- | --- |
-| "Manifest file is missing or unreadable" | The zip is nested. The `manifest.json` must be at the **root** of the archive, not inside a `domain-css-injector-v2/` sub-folder. Rebuild by zipping the **contents** of `domain-css-injector-v2/`, not the folder. |
+| **You pick the zip and *nothing happens* — no prompt, no error** | You're loading the **MV3** zip. Kiwi's Manifest V3 support is experimental and it silently rejects it. Use **`pageside-<version>-kiwi.zip`** (the Manifest V2 build) instead. |
+| "Manifest file is missing or unreadable" | The zip is nested. The `manifest.json` must be at the **root** of the archive, not inside a `domain-css-injector-v2/` sub-folder. Rebuild by zipping the **contents** of `domain-css-injector-v2/`, not the folder (or use `tools/build-kiwi-zip.sh`). |
 | `+ (from .zip/.crx…)` button isn't shown | **Developer mode** isn't on. Toggle it ON (top-right of `kiwi://extensions`) and the button appears. |
 | File picker won't show the `.zip` | It downloaded somewhere unexpected, or as `pageside.zip.bin`. Check your **Downloads**, and rename it to end in `.zip` if needed. |
 | **Pageside** isn't in the **⋮** menu after install | Make sure its toggle is **ON** in `kiwi://extensions`, then fully close and reopen the menu. |
@@ -121,13 +129,13 @@ Yandex Browser supports a curated set of Chrome Web Store extensions and can sid
 
 1. Install **Yandex Browser** from the Play Store.
 2. Open Yandex → tap **⋮** → **Settings** → **Catalog of Yandex.Browser add-ons** to enable the extension subsystem at least once.
-3. Open the `.zip` you built and rename it to `pageside-<version>.crx` (Yandex requires the `.crx` extension, but the contents are the same zip layout).
+3. Take the **`pageside-<version>-kiwi.zip`** (Manifest V2) build and rename it to `pageside-<version>.crx` (Yandex requires the `.crx` extension, but the contents are the same zip layout; like Kiwi it needs MV2).
 4. Open the file in Yandex Browser via your file manager → confirm the install prompt.
 5. Manage from **⋮** → **Add-ons**.
 
 ### Mises Browser / Lemur Browser (Android)
 
-Both are Chromium forks that mirror Kiwi's extension flow. The steps are identical to Kiwi — `⋮` → **Extensions** → enable **Developer mode** → install from the `.zip`.
+Both are Chromium forks that mirror Kiwi's extension flow. The steps are identical to Kiwi — `⋮` → **Extensions** → enable **Developer mode** → install from the **`-kiwi.zip`** (Manifest V2; like Kiwi, these forks won't load the MV3 build).
 
 ### Firefox for Android (geckoview-based)
 
@@ -191,7 +199,7 @@ There is no build step. Edit a file, then click **Reload** on the extension card
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | [`ci.yml`](./.github/workflows/ci.yml) | PR / push touching `domain-css-injector-v2/**` | Validates `manifest.json`, syntax-checks the JS files, and confirms required icon assets exist. |
-| [`release.yml`](./.github/workflows/release.yml) | tag push `v*` or manual dispatch | Validates, zips `domain-css-injector-v2/` into `pageside-<version>.zip`, uploads it as a workflow artifact, and (on tag pushes) attaches it to a GitHub Release. |
+| [`release.yml`](./.github/workflows/release.yml) | tag push `v*` or manual dispatch | Validates, then builds **two** zips — `pageside-<version>.zip` (Manifest V3, desktop) and `pageside-<version>-kiwi.zip` (Manifest V2, Kiwi / Android) — uploads them as workflow artifacts and attaches both to the GitHub Release. |
 
 ---
 
@@ -273,11 +281,14 @@ opera/
 │   ├── content.js               ← injects CSS, runs the inspect-element overlay
 │   ├── background.js            ← service worker — context-menu video downloads
 │   └── icons/                   ← 16 / 48 / 128 px PNG icons
+├── tools/                       ← build helpers (no runtime code)
+│   ├── build-kiwi-manifest.mjs  ← derives the Manifest V2 manifest from manifest.json
+│   └── build-kiwi-zip.sh        ← builds pageside-<version>-kiwi.zip locally
 ├── .github/                     ← CI, release, and dependency automation
 │   ├── dependabot.yml           ← weekly GitHub Actions updates
 │   └── workflows/
-│       ├── ci.yml               ← extension lint / validation
-│       └── release.yml          ← tagged production builds (zip + GitHub Release)
+│       ├── ci.yml               ← extension lint / validation (incl. derived MV2 manifest)
+│       └── release.yml          ← tagged production builds (MV3 + Kiwi MV2 zips + GitHub Release)
 ├── pwa-inventory.md             ← chrome.storage and manifest inventory (per repo standards)
 ├── CLAUDE.md                    ← architecture source of truth
 ├── LICENSE                      ← MIT

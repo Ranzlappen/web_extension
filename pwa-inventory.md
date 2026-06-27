@@ -149,6 +149,23 @@ Two surfaces, one HTML file:
 
 Both surfaces must continue to render `popup.html` correctly. The styles in `popup.html` are intentionally width-agnostic so the same file works as a fixed Chrome popup and as a flexible Opera sidebar.
 
+### Manifest V2 (Kiwi / Android) build
+
+A second distributable, `pageside-<version>-kiwi.zip`, ships a **Manifest V2** manifest for Kiwi and other Android Chromium forks (which only support MV2 reliably and silently reject MV3). It is **derived** from `manifest.json` by `tools/build-kiwi-manifest.mjs` — not hand-maintained — so name/version/description/icons/content_scripts round-trip identically; only the MV2-specific shape differs:
+
+| MV3 (`manifest.json`) | MV2 (`-kiwi.zip` root `manifest.json`) |
+| --- | --- |
+| `"manifest_version": 3` | `"manifest_version": 2` |
+| `action` (popup) | `browser_action` (same `default_popup`/icons) |
+| `background.service_worker` | `background.scripts` + `"persistent": false` (event page) |
+| `host_permissions: ["<all_urls>"]` | folded into `permissions` |
+| `permissions: [… "scripting" …]` | `scripting` dropped (MV3-only API) |
+| `sidebar_action`, `browser_specific_settings` | dropped (no sidebar on Kiwi; gecko key is Firefox-only) |
+
+The same `popup.js` / `content.js` / `background.js` run under both. `popup.js` routes all page injection through `injectFunc()` / `injectFile()`, which use `chrome.scripting` on MV3 and fall back to `chrome.tabs.executeScript` on MV2. CI asserts the derived MV2 manifest stays in version/name parity with `manifest.json`.
+
+### UI surface
+
 `popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads three classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus`), then `popup-notepad.js` and `popup-password.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-notepad.js` listens for it to reload the per-domain note.
 
 ---

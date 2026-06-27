@@ -61,6 +61,40 @@ async function getActiveTab() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     return tabs && tabs[0];
 }
+// Cross-manifest script injection. MV3 (Chrome/Edge/Opera/Firefox) exposes
+// chrome.scripting; MV2 (Kiwi and other Android Chromium forks) does not and
+// uses chrome.tabs.executeScript instead. Both helpers normalize to a flat
+// array of per-frame return values so call sites don't branch on the manifest.
+function injectFunc(tabId, func, { allFrames = false } = {}) {
+    if (chrome.scripting && chrome.scripting.executeScript) {
+        return chrome.scripting
+            .executeScript({ target: { tabId, allFrames }, func })
+            .then((res) => (res || []).map((r) => r && r.result));
+    }
+    return new Promise((resolve, reject) => {
+        // MV2 can't inject a function reference, so serialize and self-invoke it.
+        chrome.tabs.executeScript(tabId, { code: `(${func.toString()})();`, allFrames }, (res) => {
+            if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+            else resolve(res || []);
+        });
+    });
+}
+function injectFile(tabId, file) {
+    if (chrome.scripting && chrome.scripting.executeScript) {
+        return new Promise((resolve, reject) => {
+            chrome.scripting.executeScript({ target: { tabId }, files: [file] }, () => {
+                if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                else resolve();
+            });
+        });
+    }
+    return new Promise((resolve, reject) => {
+        chrome.tabs.executeScript(tabId, { file }, () => {
+            if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+            else resolve();
+        });
+    });
+}
 function showStatus(text, timeout = 2000) {
     const statusEl = document.getElementById('status');
     statusEl.textContent = text;
@@ -178,10 +212,7 @@ async function collectMediaSources() {
 
     let results;
     try {
-        results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        allFrames: true,
-        func: () => {
+        results = await injectFunc(tab.id, () => {
             const candidates = [];
             const seen = new Set();
 
@@ -249,8 +280,7 @@ async function collectMediaSources() {
             }
 
             return candidates;
-        }
-        });
+        }, { allFrames: true });
     } catch (err) {
         showStatus(`Cannot scan this page: ${err?.message || err}`, 3000);
         return [];
@@ -258,9 +288,9 @@ async function collectMediaSources() {
 
     const merged = [];
     const dedup = new Set();
-    (results || []).forEach((frameResult) => {
-        const frameCandidates = Array.isArray(frameResult?.result) ? frameResult.result : [];
-        frameCandidates.forEach((candidate) => {
+    (results || []).forEach((frameCandidates) => {
+        const list = Array.isArray(frameCandidates) ? frameCandidates : [];
+        list.forEach((candidate) => {
             const normalizedUrl = normalizeUrl(candidate?.url);
             if (!normalizedUrl || dedup.has(normalizedUrl)) return;
             dedup.add(normalizedUrl);
@@ -403,11 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       // The registered content script isn't reachable (e.g. the page was open
       // before the extension was installed/reloaded). Inject it once, then retry.
-      chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }, () => {
-        if (chrome.runtime.lastError) {
-          showStatus('Cannot inspect this page.', 3000);
-          return;
-        }
+      injectFile(tabId, 'content.js').then(() => {
         chrome.tabs.sendMessage(tabId, { type: 'PS_START_PICK' }, () => {
           if (chrome.runtime.lastError) {
             showStatus('Cannot inspect this page.', 3000);
@@ -415,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.close();
           }
         });
-      });
+      }).catch(() => showStatus('Cannot inspect this page.', 3000));
     });
   }
   const inspectBtn = document.getElementById('inspectBtn');
@@ -432,24 +458,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Ask the content script for the selected text
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
-          chrome.scripting.executeScript(
-            {
-              target: { tabId: tabs[0].id },
-              func: () => window.getSelection().toString()
-            },
-            (results) => {
-              if (chrome.runtime.lastError) {
-                showStatus(`Cannot read this page: ${chrome.runtime.lastError.message}`, 3000);
-                return;
-              }
-              const selectedText = results && results[0] && results[0].result;
+          injectFunc(tabs[0].id, () => window.getSelection().toString())
+            .then((results) => {
+              const selectedText = results && results[0];
               if (selectedText && selectedText.trim() !== '') {
                 speak(selectedText);
               } else {
                 showStatus('No text selected on the page.', 2500);
               }
-            }
-          );
+            })
+            .catch((err) => showStatus(`Cannot read this page: ${err.message || err}`, 3000));
         }
       });
     });
