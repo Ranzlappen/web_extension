@@ -65,13 +65,21 @@ function resolveBaseHost(hostname) {
 // the result in a never-rejecting promise.
 function queryTabs(query) {
     return new Promise((resolve) => {
+        let done = false;
+        const finish = (tabs) => { if (!done) { done = true; resolve(tabs || []); } };
+        // Kiwi sometimes accepts the callback but never invokes it, which would
+        // leave the promise (and the popup) hanging forever. Cap the wait so the
+        // caller can fall back / retry instead of stalling on "Detecting site…".
+        const timer = setTimeout(() => finish([]), 400);
         try {
             chrome.tabs.query(query, (tabs) => {
+                clearTimeout(timer);
                 void (chrome.runtime && chrome.runtime.lastError); // swallow, treat as empty
-                resolve(tabs || []);
+                finish(tabs);
             });
         } catch (_) {
-            resolve([]);
+            clearTimeout(timer);
+            finish([]);
         }
     });
 }
@@ -225,6 +233,37 @@ async function pollActiveTab() {
         const host = resolveBaseHost(new URL(tab.url).hostname);
         if (host !== activeHost) loadHost(host);
     } catch (_) { /* leave current state intact */ }
+}
+// Reserved key the content script writes with the foreground page's host. It's
+// the fallback when chrome.tabs.query is unreliable (Kiwi), since the page
+// itself always knows its own hostname.
+const LASTHOST_KEY = '__ps_lasthost';
+function hostFromTab(tab) {
+    if (!tab || !tab.url) return null;
+    try { return resolveBaseHost(new URL(tab.url).hostname); } catch (_) { return null; }
+}
+function readLastHost() {
+    return new Promise((resolve) => {
+        try { chrome.storage.local.get(LASTHOST_KEY, (r) => resolve((r && r[LASTHOST_KEY]) || null)); }
+        catch (_) { resolve(null); }
+    });
+}
+// Detect the active site, retrying because some mobile Chromium forks (Kiwi)
+// return no active tab for a beat after the popup opens — or never answer the
+// query at all. Falls back to the host the content script last recorded so the
+// site is still detected when tabs.query is broken. Returns true on success.
+async function detectActiveHost({ retries = 4, delay = 300 } = {}) {
+    for (let i = 0; i < retries; i++) {
+        // Prefer the live tab query (accurate across windows); the moment it
+        // comes up empty, fall back to the content script's recorded host so a
+        // broken tabs.query doesn't strand us on "Detecting site…".
+        const host = hostFromTab(await getActiveTab());
+        if (host) { loadHost(host); return true; }
+        const fallback = await readLastHost();
+        if (fallback) { loadHost(fallback); return true; }
+        await new Promise((r) => setTimeout(r, delay));
+    }
+    return false;
 }
 
 async function collectMediaSources() {
@@ -406,6 +445,15 @@ if (chrome.tabs && chrome.tabs.onUpdated) {
         if (info.url && tab && tab.active) pollActiveTab();
     });
 }
+// When tabs.query is unreliable (Kiwi), the content script's recorded
+// foreground host is the most reliable signal — follow it as it changes.
+if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !changes[LASTHOST_KEY]) return;
+        const h = changes[LASTHOST_KEY].newValue;
+        if (h && h !== activeHost) loadHost(h);
+    });
+}
 document.addEventListener('DOMContentLoaded', async () => {
     const cssInput = document.getElementById('cssInput');
     const saveBtn = document.getElementById('saveBtn');
@@ -413,16 +461,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
     const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-    try {
-        const tab = await getActiveTab();
-        if (tab && tab.url) {
-            loadHost(resolveBaseHost(new URL(tab.url).hostname));
-        } else {
-            document.getElementById('domainInfo').textContent = 'No active tab detected.';
-        }
-    } catch (_) {
-        document.getElementById('domainInfo').textContent = 'No active tab detected.';
-    }
+    const domainInfo = document.getElementById('domainInfo');
+    const runDetect = () => {
+        domainInfo.textContent = 'Detecting site…';
+        detectActiveHost().then((ok) => {
+            if (!ok) {
+                domainInfo.textContent = 'Could not detect the site — tap to retry.';
+                domainInfo.style.cursor = 'pointer';
+            }
+        });
+    };
+    domainInfo.addEventListener('click', () => { if (!activeHost) runDetect(); });
+    runDetect();
     saveBtn.addEventListener('click', () => persistCss(cssInput.value));
     deleteBtn.addEventListener('click', dropCss);
     refreshBtn.addEventListener('click', reloadSnippets);
