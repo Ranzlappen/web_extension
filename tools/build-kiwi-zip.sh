@@ -8,7 +8,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/domain-css-injector-v2"
+# Resolve the output dir to an ABSOLUTE path. The zip below runs inside a
+# `cd "$STAGE"` subshell, so a relative $OUT (e.g. the workflow passes "dist")
+# would resolve against the temp dir and zip would fail with exit 15
+# ("could not open output file for writing").
 OUTDIR="${1:-$ROOT/dist}"
+mkdir -p "$OUTDIR"
+OUTDIR="$(cd "$OUTDIR" && pwd)"
 VERSION="$(node -e "console.log(require('$SRC/manifest.json').version)")"
 OUT="$OUTDIR/pageside-${VERSION}-kiwi.zip"
 
@@ -20,7 +26,6 @@ cp -r "$SRC"/. "$STAGE"/
 rm -f "$STAGE/manifest.json"
 node "$ROOT/tools/build-kiwi-manifest.mjs" "$SRC/manifest.json" > "$STAGE/manifest.json"
 
-mkdir -p "$OUTDIR"
 rm -f "$OUT"
 ( cd "$STAGE" && zip -r "$OUT" . -x "*.DS_Store" "Thumbs.db" >/dev/null )
 
