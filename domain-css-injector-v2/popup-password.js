@@ -6,14 +6,23 @@
 (function () {
   // --- Cryptographic randomness ------------------------------------------
   // Uniform integer in [0, max) via rejection sampling. A plain
-  // getRandomValues % max skews toward low values when 256 % max !== 0; we
-  // discard bytes in the biased tail so every index is equally likely.
+  // getRandomValues % max skews toward low values when range % max !== 0; we
+  // discard values in the biased tail so every index is equally likely.
+  // Draws as many bytes as max needs — a single byte only covers max <= 256,
+  // so larger pools (e.g. the Chinese set pushes the pool past 256) would make
+  // a one-byte limit collapse to 0 and loop forever.
   function randIndex(max) {
-    if (max <= 0) return 0;
-    const limit = 256 - (256 % max); // largest multiple of max <= 256
-    const buf = new Uint8Array(1);
+    if (max <= 1) return 0;
+    const bytes = Math.ceil(Math.log2(max) / 8);
+    const range = Math.pow(256, bytes);
+    const limit = range - (range % max); // largest multiple of max <= range
+    const buf = new Uint8Array(bytes);
     let x;
-    do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+    do {
+      crypto.getRandomValues(buf);
+      x = 0;
+      for (let i = 0; i < bytes; i++) x = x * 256 + buf[i];
+    } while (x >= limit);
     return x % max;
   }
   function pickFrom(str) { return str[randIndex(str.length)]; }

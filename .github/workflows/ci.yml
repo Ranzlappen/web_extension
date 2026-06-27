@@ -12,10 +12,12 @@ on:
     branches: [main]
     paths:
       - "domain-css-injector-v2/**"
+      - "tools/**"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "domain-css-injector-v2/**"
+      - "tools/**"
       - ".github/workflows/ci.yml"
 
 concurrency:
@@ -54,3 +56,22 @@ jobs:
             test -f "domain-css-injector-v2/icons/icon${size}.png" \
               || { echo "Missing icon: icons/icon${size}.png"; exit 1; }
           done
+
+      - name: Validate derived Kiwi (Manifest V2) manifest
+        run: |
+          set -e
+          node tools/build-kiwi-manifest.mjs domain-css-injector-v2/manifest.json > /tmp/kiwi-manifest.json
+          node -e "
+            const fs=require('fs');
+            const mv3=JSON.parse(fs.readFileSync('domain-css-injector-v2/manifest.json','utf8'));
+            const k=JSON.parse(fs.readFileSync('/tmp/kiwi-manifest.json','utf8'));
+            const fail=(m)=>{console.error('::error::'+m);process.exit(1);};
+            if(k.manifest_version!==2) fail('Kiwi manifest must be manifest_version 2');
+            if(k.version!==mv3.version) fail('Kiwi/MV3 version drift');
+            if(k.name!==mv3.name) fail('Kiwi/MV3 name drift');
+            if(!k.browser_action||!k.browser_action.default_popup) fail('Kiwi browser_action.default_popup missing');
+            if((k.permissions||[]).includes('scripting')) fail(\"'scripting' is invalid in MV2\");
+            if(!(k.permissions||[]).includes('<all_urls>')) fail('MV2 build needs <all_urls> host permission');
+            if(!k.background||k.background.persistent!==false) fail('MV2 background must be a non-persistent event page');
+            console.log('Kiwi MV2 manifest OK (v'+k.version+')');
+          "

@@ -1,7 +1,9 @@
 # Production release builds for the unpacked extension. Packages
-# domain-css-injector-v2/ into a distributable .zip and attaches it to a
-# GitHub Release. There is no build step for the extension itself — this
-# workflow only validates and zips the source folder as it ships.
+# domain-css-injector-v2/ into two distributable .zips and attaches them to a
+# GitHub Release: the Manifest V3 build (desktop Chrome/Edge/Opera/Firefox) and
+# a Manifest V2 "-kiwi" build for Kiwi / Android Chromium forks (which only
+# support MV2 reliably). The MV2 manifest is derived from the MV3 manifest, so
+# the only "build step" is that manifest transform — the JS ships unchanged.
 #
 # Triggers:
 #   * workflow_dispatch -> fully automated release. Pick a bump level
@@ -150,15 +152,38 @@ jobs:
           fi
           echo "manifest.json found at zip root."
 
-      # NOTE: Downloading this artifact from the Actions UI re-zips it (GitHub
-      # wraps artifacts), producing a zip-in-zip with no manifest at the root.
-      # For store/AMO uploads, use the asset attached to the GitHub Release
-      # (created below), or build the zip locally.
-      - name: Upload workflow artifact
+      # Kiwi Browser (and other Android Chromium forks) only support Manifest V2
+      # reliably, so ship a parallel MV2 build. The MV2 manifest is derived from
+      # the MV3 manifest by tools/build-kiwi-manifest.mjs (single source of
+      # truth — no version drift); the same JS runs under both manifests.
+      - name: Build Kiwi (Manifest V2) zip
+        id: build_kiwi
+        run: |
+          set -e
+          bash tools/build-kiwi-zip.sh dist
+          OUT="dist/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}-kiwi.zip"
+          test -f "$OUT" || { echo "::error::Kiwi zip not produced at $OUT"; ls -la dist; exit 1; }
+          echo "artifact=$OUT" >> "$GITHUB_OUTPUT"
+          # The zip's root manifest must be valid MV2 at the matching version.
+          node -e "
+            const cp=require('child_process');
+            const m=JSON.parse(cp.execSync('unzip -p \"$OUT\" manifest.json').toString());
+            if(m.manifest_version!==2){console.error('::error::Kiwi manifest is not v2');process.exit(1);}
+            if(m.version!=='${{ steps.meta.outputs.version }}'){console.error('::error::Kiwi version drift');process.exit(1);}
+            console.log('Kiwi zip OK: MV2, version '+m.version);
+          "
+
+      # NOTE: Downloading these artifacts from the Actions UI re-zips them
+      # (GitHub wraps artifacts), producing a zip-in-zip with no manifest at the
+      # root. For store/AMO uploads or sideloading on Kiwi, use the assets
+      # attached to the GitHub Release (created below), or build the zip locally.
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
-          path: ${{ steps.build.outputs.artifact }}
+          path: |
+            ${{ steps.build.outputs.artifact }}
+            ${{ steps.build_kiwi.outputs.artifact }}
           if-no-files-found: error
 
       - name: Create / update GitHub Release
@@ -166,5 +191,7 @@ jobs:
         with:
           name: ${{ steps.meta.outputs.tag }}
           tag_name: ${{ steps.meta.outputs.tag }}
-          files: ${{ steps.build.outputs.artifact }}
+          files: |
+            ${{ steps.build.outputs.artifact }}
+            ${{ steps.build_kiwi.outputs.artifact }}
           generate_release_notes: true
