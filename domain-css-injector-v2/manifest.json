@@ -8,6 +8,7 @@
     "activeTab",
     "scripting",
     "tabs",
+    "tabGroups",
     "clipboardWrite",
     "downloads",
     "contextMenus"
