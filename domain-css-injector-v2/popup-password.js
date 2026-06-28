@@ -33,6 +33,9 @@
     upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
     digit: '0123456789',
     sym: '!@#$%^&*()-_=+[]{};:,.<>?',
+    // Accented / umlaut Latin letters (German, Scandinavian, Polish, French,
+    // etc.), lower + upper. All BMP, safe for string indexing.
+    accented: 'àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿāăąćčďęěğıłńňőœřśšťůűųźżžÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝŁŃŚŠŻŽ',
     // Russian Cyrillic alphabet, lower + upper.
     cyrillic: 'абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ',
     // Greek alphabet, lower + upper (final sigma included).
@@ -45,7 +48,7 @@
   function buildPool(opts) {
     let pool = '';
     const req = [];
-    for (const k of ['lower', 'upper', 'digit', 'sym', 'cyrillic', 'greek', 'chinese']) {
+    for (const k of ['lower', 'upper', 'digit', 'sym', 'accented', 'cyrillic', 'greek', 'chinese']) {
       if (opts[k]) {
         let s = SETS[k];
         if (opts.noAmbig) s = s.replace(AMBIG, '');
@@ -152,6 +155,7 @@
       upper: $('pwUpper').checked,
       digit: $('pwDigit').checked,
       sym: $('pwSym').checked,
+      accented: $('pwAccented').checked,
       cyrillic: $('pwCyrillic').checked,
       greek: $('pwGreek').checked,
       chinese: $('pwChinese').checked,
@@ -229,7 +233,7 @@
       updateLabel();
       renderStrength(readOpts());
     });
-    ['pwLower', 'pwUpper', 'pwDigit', 'pwSym', 'pwCyrillic', 'pwGreek', 'pwChinese', 'pwNoAmbig', 'pwEach'].forEach((id) => {
+    ['pwLower', 'pwUpper', 'pwDigit', 'pwSym', 'pwAccented', 'pwCyrillic', 'pwGreek', 'pwChinese', 'pwNoAmbig', 'pwEach'].forEach((id) => {
       $(id).addEventListener('change', () => renderStrength(readOpts()));
     });
     $('pwPass').addEventListener('change', () => { syncSliderMode(); renderStrength(readOpts()); });
