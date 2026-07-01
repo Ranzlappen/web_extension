@@ -219,6 +219,25 @@ There is no build step. Edit a file, then click **Reload** on the extension card
 
 Saved snippets appear in the **Saved snippets** list at the bottom of the popup. Click any entry to load it back into the editor.
 
+### Common CSS snippets
+
+Not sure what to type? These are the most common one-liners. Use **Select Container** to grab the exact `.class` or `#id` you want to target, then drop it into one of these patterns. Add `!important` if the site's own styles win.
+
+| Goal | Snippet |
+| --- | --- |
+| Hide an element (banner, popup, sidebar) | `.cookie-banner { display: none; }` |
+| Hide by id | `#newsletter-modal { display: none; }` |
+| Hide an element but keep its space | `.ad-slot { visibility: hidden; }` |
+| Bump the base font size for readability | `body { font-size: 18px; }` |
+| Widen a cramped reading column | `.article { max-width: 100%; }` |
+| Re-enable scrolling on a locked modal | `html, body { overflow: auto !important; }` |
+| Un-stick a sticky/fixed header | `.site-header { position: static !important; }` |
+| Force a calmer background + text colour | `body { background: #0f121c; color: #e6e8ef; }` |
+| Recolour all links | `a { color: #4aa3ff; }` |
+| Hide images (data-saver / declutter) | `img { display: none; }` |
+| Kill an overlay dimmer | `.overlay, .backdrop { display: none !important; }` |
+| Disable animations page-wide | `* { animation: none !important; }` |
+
 ---
 
 ## How to download a video from a page
