@@ -16,10 +16,11 @@ This inventory captures every key, path, and identifier whose value is part of t
 | `__ps_notes` | `popup-notepad.js` | `object` (`{ "<base-domain>": "<note>" }`) | Per-domain private notepad. A single map keyed by base domain. Empty notes are pruned from the map. |
 | `__ps_lasthost` | `content.js` | `string` (base domain) | The foreground page's base host, written by the content script while the tab is visible. The popup reads it as a fallback for active-site detection when `chrome.tabs.query` is unreliable (Kiwi / Android forks). |
 | `__ps_off` | `popup.js` (written), `content.js` (read) | `object` (`{ "<base-domain>": true }`) | Domains whose saved CSS is temporarily switched off via the Style section's "Apply style on this site" toggle. The CSS snippet itself stays saved under the bare-domain key; `content.js` skips injection while the domain is listed and reacts live to changes. Re-enabling deletes the entry (the map only holds `true` values). |
+| `__ps_draft` | `popup-editor.js` | `object` (`{ "<base-domain>": { base, text } }`) | Unsaved CSS-editor drafts, debounce-written as the user types. `text` is the draft; `base` is the saved CSS the draft was typed against — on restore, a draft whose `base` no longer matches the current saved CSS is discarded as stale (e.g. Hide Element added a rule while the popup was closed). Cleared when a save/delete for the domain lands. |
 
 ### Reserved `__ps_` prefix
 
-All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`, `__ps_off`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Three invariants protect this:
+All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`, `__ps_off`, `__ps_draft`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Three invariants protect this:
 
 * `renderSnippets()` in `popup.js` filters out any key matching `isReservedKey(k)` (`k.startsWith('__ps_')`) so internal keys never appear as fake CSS snippets.
 * **Export JSON** strips the same prefix so private notes never leak into a shared snippet backup.
@@ -37,8 +38,10 @@ Read sites:
 
 Write sites:
 
-* `popup.js:77` — `chrome.storage.local.set({ [currentDomain]: css }, …)` on **Save**
-* `popup.js:84` — `chrome.storage.local.remove([currentDomain], …)` on **Delete**
+* `popup.js` — `chrome.storage.local.set({ [currentDomain]: css }, …)` on **Save**
+* `popup.js` — `chrome.storage.local.remove([currentDomain], …)` on **Delete**
+* `popup.js` — `chrome.storage.local.set(valid, …)` on **Import JSON** (domain-shaped string keys only)
+* `content.js` — `appendHideRule()` appends a `display:none !important` rule to the domain key when the user picks an element in the inspector's **hide** mode (`PS_START_PICK` with `mode: 'hide'`)
 
 ## 2. Schema versions
 
@@ -172,7 +175,7 @@ The same `popup.js` / `content.js` / `background.js` run under both. `popup.js` 
 
 ### UI surface
 
-`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools / Tabs) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads four classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus` / `resolveBaseHost`), then `popup-notepad.js`, `popup-password.js`, and `popup-tabs.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-notepad.js` listens for it to reload the per-domain note and `popup-tabs.js` to refresh its tab list. `popup-tabs.js` persists **nothing** (it acts on live tabs), so it adds no storage key.
+`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools / Tabs) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads five classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus` / `resolveBaseHost`), then `popup-editor.js`, `popup-notepad.js`, `popup-password.js`, and `popup-tabs.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-editor.js` listens for it to reload the per-domain draft, `popup-notepad.js` to reload the per-domain note, and `popup-tabs.js` to refresh its tab list. `popup-editor.js` persists only the `__ps_draft` key (see §1); `popup-tabs.js` persists **nothing** (it acts on live tabs), so it adds no storage key.
 
 ---
 

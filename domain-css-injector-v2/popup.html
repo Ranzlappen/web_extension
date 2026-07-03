@@ -14,6 +14,12 @@
         h3{margin:0 0 8px 0}
         h4{margin:8px 0 8px 0}
         textarea{width:100%;height:160px;box-sizing:border-box;font-family:monospace;background-color:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:6px;padding:8px;}
+        /* Code editor: line-number gutter + textarea share one bordered box.
+           Both sides pin the same font/line-height so the numbers stay aligned. */
+        .editor{display:flex;align-items:stretch;border:1px solid #2a2f44;border-radius:6px;background:#161a26;overflow:hidden}
+        .editor textarea{border:none;border-radius:0;flex:1 1 auto;min-width:0;white-space:pre;overflow:auto;resize:vertical}
+        .editor textarea, #cssGutter{font-family:monospace;font-size:13px;line-height:1.5}
+        #cssGutter{margin:0;padding:8px 6px 8px 8px;flex:0 0 auto;min-width:2ch;text-align:right;color:#5a627a;background:#11151f;border-right:1px solid #2a2f44;overflow:hidden;user-select:none}
         button{background-color: black;color:#fff;border:1px solid #2a2f44;margin-top:8px;padding:10px 8px;width:100%;min-height:44px;border-radius:8px;}
         button:hover{background-color:#313151;cursor:pointer;}
         #list{margin-top:8px;max-height:40vh;overflow:auto;border:1px solid #2a2f44;padding:6px;border-radius:6px;}
@@ -67,17 +73,22 @@
             <div class="sec-body">
                 <div class="hint">Enter custom CSS below</div>
                 <label class="opt"><input type="checkbox" id="siteEnabled" checked> Apply style on this site</label>
-                <textarea id="cssInput" placeholder="Enter custom CSS for this site
+                <div class="editor">
+                    <pre id="cssGutter" aria-hidden="true">1</pre>
+                    <textarea id="cssInput" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Enter custom CSS for this site
 
 .class  {style:example;}
 #id     {style:example;}
 body    {style:example;}
 *       {style:example;}"></textarea>
+                </div>
+                <div class="hint">Tab indents · Enter auto-indents · Ctrl/Cmd+S saves. Unsaved edits are kept as a draft.</div>
                 <div class="controls">
                     <button id="saveBtn">Save Style Changes</button>
                     <button id="previewBtn">Preview on Page</button>
                     <button id="deleteBtn">Delete Style for this Page</button>
                     <button id="inspectBtn">Select Container</button>
+                    <button id="hideBtn">Hide Element</button>
                 </div>
                 <div class="hint" style="margin-top:10px">Quick presets — added to the editor, then Preview or Save:</div>
                 <div class="controls">
@@ -178,6 +189,7 @@ body    {style:example;}
             </div>
         </details>
     <script src="popup.js"></script>
+    <script src="popup-editor.js"></script>
     <script src="popup-notepad.js"></script>
     <script src="popup-password.js"></script>
     <script src="popup-tabs.js"></script>

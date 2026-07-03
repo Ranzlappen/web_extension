@@ -716,8 +716,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     reloadSnippets();
 });
 document.addEventListener('DOMContentLoaded', () => {
-  function startPick(tabId) {
-    messageTab(tabId, { type: 'PS_START_PICK' })
+  // mode 'copy' (default) copies the tapped element's selector; mode 'hide'
+  // appends a display:none rule to the site's saved CSS and hides it live.
+  function startPick(tabId, mode) {
+    messageTab(tabId, { type: 'PS_START_PICK', mode })
       .then(() => window.close())
       .catch(() => showStatus('Cannot inspect this page.', 3000));
   }
@@ -726,6 +728,14 @@ document.addEventListener('DOMContentLoaded', () => {
     inspectBtn.addEventListener('click', async () => {
       const tab = await getActiveTab();
       if (tab && tab.id) startPick(tab.id);
+      else showStatus('No active tab detected.', 2500);
+    });
+  }
+  const hideBtn = document.getElementById('hideBtn');
+  if (hideBtn) {
+    hideBtn.addEventListener('click', async () => {
+      const tab = await getActiveTab();
+      if (tab && tab.id) startPick(tab.id, 'hide');
       else showStatus('No active tab detected.', 2500);
     });
   }
