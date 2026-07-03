@@ -15,27 +15,74 @@ if (!window.__ps_kx9w4_init) {
   (function () {
     try {
       const host = resolveBaseHost(window.location.hostname);
-      chrome.storage.local.get([host], (res) => {
-        if (res[host]) {
-          const node = document.createElement('style');
-          node.id = '__ps_kx9w4_style';
-          node.textContent = res[host];
-          document.documentElement.appendChild(node);
-        }
+      const STYLE_ID = '__ps_kx9w4_style';
+      const PREVIEW_ID = '__ps_kx9w4_prev';
+      // Reserved key: map of base-domain -> true for sites where the user has
+      // temporarily switched the saved CSS off without deleting it.
+      const OFF_KEY = '__ps_off';
+      let savedCss = '';
+      let siteOff = false;
+
+      // Single writer for the saved-CSS <style> node: (re)creates it when there
+      // is CSS to apply and the site isn't switched off, removes it otherwise —
+      // so Delete / toggle-off never leave an empty node behind.
+      function syncStyle() {
+        const old = document.getElementById(STYLE_ID);
+        if (old) old.remove();
+        if (!savedCss || siteOff) return;
+        const node = document.createElement('style');
+        node.id = STYLE_ID;
+        node.textContent = savedCss;
+        document.documentElement.appendChild(node);
+      }
+      function clearPreview() {
+        const prev = document.getElementById(PREVIEW_ID);
+        if (prev) prev.remove();
+      }
+
+      chrome.storage.local.get([host, OFF_KEY], (res) => {
+        savedCss = res[host] || '';
+        siteOff = !!((res[OFF_KEY] || {})[host]);
+        syncStyle();
       });
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && changes[host]) {
-          // Skip re-injection when the value didn't actually change (e.g. an
-          // unrelated key was written in the same set() call).
-          if (changes[host].newValue === changes[host].oldValue) return;
-          const oldNode = document.getElementById('__ps_kx9w4_style');
-          if (oldNode) oldNode.remove();
-          const nextNode = document.createElement('style');
-          nextNode.id = '__ps_kx9w4_style';
-          nextNode.textContent = changes[host].newValue || '';
-          document.documentElement.appendChild(nextNode);
+        if (areaName !== 'local') return;
+        let dirty = false;
+        // Skip re-injection when the value didn't actually change (e.g. an
+        // unrelated key was written in the same set() call).
+        if (changes[host] && changes[host].newValue !== changes[host].oldValue) {
+          savedCss = changes[host].newValue || '';
+          clearPreview(); // a save/delete supersedes any live preview
+          dirty = true;
         }
+        if (changes[OFF_KEY]) {
+          const next = !!((changes[OFF_KEY].newValue || {})[host]);
+          if (next !== siteOff) { siteOff = next; dirty = true; }
+        }
+        if (dirty) syncStyle();
       });
+
+      // Live preview: the popup sends the editor's CSS without saving it. The
+      // preview node replaces the saved node (so deleted rules disappear too)
+      // and lasts until the next save/delete or a page reload.
+      if (chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+          if (!msg || msg.type !== 'PS_PREVIEW') return;
+          if (typeof msg.css === 'string' && msg.css.trim()) {
+            const old = document.getElementById(STYLE_ID);
+            if (old) old.remove();
+            clearPreview();
+            const node = document.createElement('style');
+            node.id = PREVIEW_ID;
+            node.textContent = msg.css;
+            document.documentElement.appendChild(node);
+          } else {
+            clearPreview();
+            syncStyle();
+          }
+          if (sendResponse) sendResponse({ ok: true });
+        });
+      }
     } catch (e) { console.error('style injection error:', e); }
   })();
 

@@ -66,6 +66,7 @@
             <summary>Style</summary>
             <div class="sec-body">
                 <div class="hint">Enter custom CSS below</div>
+                <label class="opt"><input type="checkbox" id="siteEnabled" checked> Apply style on this site</label>
                 <textarea id="cssInput" placeholder="Enter custom CSS for this site
 
 .class  {style:example;}
@@ -74,8 +75,16 @@ body    {style:example;}
 *       {style:example;}"></textarea>
                 <div class="controls">
                     <button id="saveBtn">Save Style Changes</button>
+                    <button id="previewBtn">Preview on Page</button>
                     <button id="deleteBtn">Delete Style for this Page</button>
                     <button id="inspectBtn">Select Container</button>
+                </div>
+                <div class="hint" style="margin-top:10px">Quick presets — added to the editor, then Preview or Save:</div>
+                <div class="controls">
+                    <button class="preset" data-preset="dark" type="button">Dark mode</button>
+                    <button class="preset" data-preset="nosticky" type="button">Hide sticky/cookie bars</button>
+                    <button class="preset" data-preset="readable" type="button">Readable text</button>
+                    <button class="preset" data-preset="bigtext" type="button">Bigger text</button>
                 </div>
             </div>
         </details>
@@ -124,7 +133,13 @@ body    {style:example;}
                 <h4>Read Aloud</h4>
                 <div class="controls">
                     <button id="readTextBtn">Read Selected Text</button>
+                    <button id="readPageBtn">Read Whole Page</button>
                     <button id="stopReadBtn">Stop Reading</button>
+                </div>
+                <label class="opt"><span style="flex:0 0 auto">Speed: <span id="ttsRateVal">1.0×</span></span><input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1"></label>
+                <h4>Capture</h4>
+                <div class="controls">
+                    <button id="screenshotBtn">Screenshot Visible Page</button>
                 </div>
                 <h4>Media</h4>
                 <div class="controls">
@@ -136,7 +151,9 @@ body    {style:example;}
                 <div class="controls">
                     <button id="refreshBtn">Refresh list</button>
                     <button id="exportBtn">Export JSON</button>
+                    <button id="importBtn">Import JSON</button>
                 </div>
+                <input type="file" id="importFile" accept=".json,application/json" hidden>
                 <div id="list"></div>
             </div>
         </details>

@@ -15,15 +15,17 @@ This inventory captures every key, path, and identifier whose value is part of t
 | `<base-domain>` (e.g. `example.com`) | `resolveBaseHost(window.location.hostname)` in `popup.js` and `content.js` (renamed from `getBaseDomain` in the obfuscation pass — same algorithm) | `string` (CSS source) | The set is open-ended — every domain the user has saved CSS for is one key. |
 | `__ps_notes` | `popup-notepad.js` | `object` (`{ "<base-domain>": "<note>" }`) | Per-domain private notepad. A single map keyed by base domain. Empty notes are pruned from the map. |
 | `__ps_lasthost` | `content.js` | `string` (base domain) | The foreground page's base host, written by the content script while the tab is visible. The popup reads it as a fallback for active-site detection when `chrome.tabs.query` is unreliable (Kiwi / Android forks). |
+| `__ps_off` | `popup.js` (written), `content.js` (read) | `object` (`{ "<base-domain>": true }`) | Domains whose saved CSS is temporarily switched off via the Style section's "Apply style on this site" toggle. The CSS snippet itself stays saved under the bare-domain key; `content.js` skips injection while the domain is listed and reacts live to changes. Re-enabling deletes the entry (the map only holds `true` values). |
 
 ### Reserved `__ps_` prefix
 
-All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Two invariants protect this:
+All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`, `__ps_off`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Three invariants protect this:
 
 * `renderSnippets()` in `popup.js` filters out any key matching `isReservedKey(k)` (`k.startsWith('__ps_')`) so internal keys never appear as fake CSS snippets.
 * **Export JSON** strips the same prefix so private notes never leak into a shared snippet backup.
+* **Import JSON** applies the gate in reverse: imported files may only set string values under domain-shaped keys (reserved keys and non-string values are skipped), so a crafted backup can never overwrite `__ps_` state.
 
-Any future internal key (UI state, settings, etc.) **must** use this prefix and inherit both exclusions.
+Any future internal key (UI state, settings, etc.) **must** use this prefix and inherit all three exclusions.
 
 Read sites:
 
@@ -79,7 +81,7 @@ The on-page code is still a content script registered at `document_start`:
 ]
 ```
 
-The injected `<style>` element id is `__ps_kx9w4_style` (deliberately neutral / randomized so anti-extension scripts cannot fingerprint it). Round-trip the same id in `content.js` if it is ever changed.
+The injected `<style>` element id is `__ps_kx9w4_style`, and the live-preview node (created by the popup's **Preview on Page** button via a `PS_PREVIEW` runtime message) is `__ps_kx9w4_prev` (both deliberately neutral / randomized so anti-extension scripts cannot fingerprint them). Round-trip the same ids in `content.js` if either is ever changed. The preview node exists only until the next save/delete or a page reload and is never persisted.
 
 ## 4. Manifest paths
 
@@ -132,9 +134,11 @@ Host permission: `<all_urls>` (required because the extension targets any site t
 
 Runtime gestures:
 
-* Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** button click in `popup.js`
+* Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** / **Read Whole Page** button clicks in `popup.js`
 * `navigator.clipboard.writeText` — gated on a click within the page during picker mode (`content.js`, in `onPickerSelect`)
-* `chrome.downloads.download` — gated on either the popup's **Download Video Media** button click (`popup.js`, in `pickAndSaveMedia`) or the right-click context-menu **Download this video** entry handled by `background.js`
+* `chrome.downloads.download` — gated on the popup's **Download Video Media** button click (`popup.js`, in `pickAndSaveMedia`), the **Screenshot Visible Page** button click (`popup.js`, in `captureScreenshot`), or the right-click context-menu **Download this video** entry handled by `background.js`
+* `chrome.tabs.captureVisibleTab` — gated on the **Screenshot Visible Page** button click (`popup.js`, in `captureScreenshot`); covered by the existing `activeTab` / `<all_urls>` grants, no new permission
+* File read for **Import JSON** — gated on the user picking a file through the popup's native file input; the file is parsed locally with `FileReader`, never uploaded
 
 These gestures must stay attached to their current click handlers; moving them to module-load time will silently break the feature.
 

@@ -1,6 +1,10 @@
 let activeHost = null;
 let ttsVoice;
+let ttsRate = 1;
 let mediaCandidates = [];
+// Reserved key: map of base-domain -> true for sites where the saved CSS is
+// temporarily switched off (content.js skips injection while set).
+const OFF_KEY = '__ps_off';
 
 function normalizeUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -36,6 +40,29 @@ if ('speechSynthesis' in window) {
   speechSynthesis.onvoiceschanged = () => { ttsVoice = pickVoice(); };
   ttsVoice = pickVoice();
 }
+// Chromium's speech engine silently dies on utterances longer than ~15 seconds,
+// so long text is split at sentence boundaries into short utterances and queued.
+// The queue survives Stop (cancel flushes it) and each chunk restarts the timer.
+function chunkText(text, max = 220) {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  const parts = clean.split(/(?<=[.!?…;:])\s+/);
+  const chunks = [];
+  let cur = '';
+  for (const p of parts) {
+    if (cur && cur.length + p.length + 1 > max) { chunks.push(cur); cur = p; }
+    else cur = cur ? cur + ' ' + p : p;
+    // A single run-on sentence can still exceed the cap — wrap it at a space.
+    while (cur.length > max) {
+      let cut = cur.lastIndexOf(' ', max);
+      if (cut < max / 2) cut = max;
+      chunks.push(cur.slice(0, cut));
+      cur = cur.slice(cut).trim();
+    }
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
+}
 function speak(text) {
   if (!('speechSynthesis' in window)) {
     showStatus('Speech synthesis is not available in this browser.', 3000);
@@ -43,12 +70,19 @@ function speak(text) {
   }
   try {
     speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
     const voice = ttsVoice || pickVoice();
-    if (voice) utterance.voice = voice;
-    utterance.onerror = () => showStatus('Speech failed on this device.', 3000);
-    speechSynthesis.speak(utterance);
+    chunkText(text).forEach((chunk) => {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      utterance.rate = ttsRate;
+      utterance.lang = (voice && voice.lang) || 'en-US';
+      if (voice) utterance.voice = voice;
+      utterance.onerror = (e) => {
+        // Stop / a new read cancels the queue — that's not a failure.
+        if (e && (e.error === 'canceled' || e.error === 'interrupted')) return;
+        showStatus('Speech failed on this device.', 3000);
+      };
+      speechSynthesis.speak(utterance);
+    });
   } catch (_) {
     showStatus('Speech failed to start.', 3000);
   }
@@ -133,8 +167,10 @@ function showStatus(text, timeout = 2000) {
 function loadHost(host) {
     activeHost = host;
     document.getElementById('domainInfo').textContent = `Detected site: ${host}`;
-    chrome.storage.local.get([host], (res) => {
+    chrome.storage.local.get([host, OFF_KEY], (res) => {
         document.getElementById('cssInput').value = res[host] || '';
+        const toggle = document.getElementById('siteEnabled');
+        if (toggle) toggle.checked = !((res[OFF_KEY] || {})[host]);
     });
     // Broadcast so decoupled modules (notepad) can reload their per-domain
     // state without popup.js needing to know about them.
@@ -171,6 +207,10 @@ function validateCss(css) {
 }
 function persistCss(css) {
     if (!activeHost) return;
+    if (!css.trim()) {
+        showStatus('Nothing to save — use Delete to remove this site\'s style.', 3000);
+        return;
+    }
     if (!validateCss(css)) {
         showStatus('Style is invalid, not saved.');
         return;
@@ -186,6 +226,28 @@ function dropCss() {
         document.getElementById('cssInput').value = '';
         showStatus('Deleted for this site.');
         reloadSnippets();
+        // A delete with nothing saved fires no storage change, so clear any
+        // live preview explicitly (best-effort — page may have no script).
+        getActiveTab().then((tab) => {
+            if (tab && tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: 'PS_PREVIEW', css: '' }, () => {
+                    void (chrome.runtime && chrome.runtime.lastError);
+                });
+            }
+        });
+    });
+}
+// Flip the per-site on/off switch. The domain's CSS stays saved; content.js
+// watches the reserved `__ps_off` map and applies the change live.
+function setSiteEnabled(enabled) {
+    if (!activeHost) return;
+    chrome.storage.local.get(OFF_KEY, (r) => {
+        const map = r[OFF_KEY] || {};
+        if (enabled) delete map[activeHost];
+        else map[activeHost] = true;
+        chrome.storage.local.set({ [OFF_KEY]: map }, () => {
+            showStatus(enabled ? 'Style enabled on this site.' : 'Style switched off on this site (kept saved).', 2500);
+        });
     });
 }
 // Storage keys are bare domains holding CSS, EXCEPT internal keys namespaced
@@ -206,7 +268,10 @@ function renderSnippets(items) {
     keys.forEach((k) => {
         const div = document.createElement('div');
         div.className = 'kv';
-        const preview = items[k].length > 200 ? items[k].slice(0, 200) + '…' : items[k];
+        // Coerce defensively: a corrupt non-string value must not throw and
+        // blank the whole list.
+        const value = typeof items[k] === 'string' ? items[k] : String(items[k] ?? '');
+        const preview = value.length > 200 ? value.slice(0, 200) + '…' : value;
         // Built with DOM APIs / textContent rather than innerHTML so storage
         // keys (domains) and snippet bodies can never be parsed as markup.
         const title = document.createElement('strong');
@@ -217,7 +282,7 @@ function renderSnippets(items) {
         div.appendChild(title);
         div.appendChild(body);
         div.addEventListener('click', () => {
-            document.getElementById('cssInput').value = items[k];
+            document.getElementById('cssInput').value = value;
             showStatus(`Loaded ${k} into editor`, 1500);
         });
         list.appendChild(div);
@@ -425,6 +490,130 @@ function renderMediaCandidates(list) {
     });
 }
 
+// Send a message to the tab's content script, injecting content.js once and
+// retrying when the registered instance isn't reachable (e.g. the page was
+// open before the extension was installed/reloaded). Shared by the inspect
+// picker and the live-preview flow.
+function messageTab(tabId, msg) {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.sendMessage(tabId, msg, (resp) => {
+            if (!chrome.runtime.lastError && resp) {
+                resolve(resp);
+                return;
+            }
+            injectFile(tabId, 'content.js').then(() => {
+                chrome.tabs.sendMessage(tabId, msg, (resp2) => {
+                    if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message || 'Page not reachable'));
+                    else resolve(resp2);
+                });
+            }).catch(reject);
+        });
+    });
+}
+
+// Live preview: push the editor's CSS onto the page without saving. It stays
+// until the next Save / Delete or a page reload.
+async function previewCss() {
+    const tab = await getActiveTab();
+    if (!tab || !tab.id) {
+        showStatus('No active tab detected.', 2500);
+        return;
+    }
+    const css = document.getElementById('cssInput').value;
+    try {
+        await messageTab(tab.id, { type: 'PS_PREVIEW', css });
+        showStatus(css.trim() ? 'Previewing — Save to keep, reload to discard.' : 'Preview cleared.', 3000);
+    } catch (_) {
+        showStatus('Cannot preview on this page.', 3000);
+    }
+}
+
+// One-tap screenshot of the visible tab, saved through the native download
+// manager. Needs no extra permission: activeTab / <all_urls> already cover
+// captureVisibleTab, and downloads is held for the media saver.
+function captureScreenshot() {
+    if (!(chrome.tabs && typeof chrome.tabs.captureVisibleTab === 'function')) {
+        showStatus('Screenshots are not supported in this browser.', 3000);
+        return;
+    }
+    chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+        if (chrome.runtime.lastError || !dataUrl) {
+            showStatus(`Screenshot failed: ${chrome.runtime.lastError?.message || 'no image returned'}`, 3000);
+            return;
+        }
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+        chrome.downloads.download({
+            url: dataUrl,
+            filename: `pageside-${activeHost || 'page'}-${stamp}.png`,
+            conflictAction: 'uniquify'
+        }, (downloadId) => {
+            if (chrome.runtime.lastError || !downloadId) {
+                showStatus(`Screenshot failed: ${chrome.runtime.lastError?.message || 'download rejected'}`, 3000);
+            } else {
+                showStatus('Screenshot saved to downloads.', 2500);
+            }
+        });
+    });
+}
+
+// Starting-point CSS templates appended into the editor (never auto-saved) —
+// the user tunes the selectors per site, then Previews / Saves.
+const CSS_PRESETS = {
+    dark: `/* Dark mode (invert-based) */
+html { filter: invert(0.92) hue-rotate(180deg); background: #0d0d0d !important; }
+img, picture, video, canvas, iframe, svg { filter: invert(1) hue-rotate(180deg); }`,
+    nosticky: `/* Hide sticky bars & cookie prompts — tune the selectors per site */
+[class*="cookie"], [id*="cookie"], [class*="consent"], [id*="consent"],
+[class*="newsletter"], [class*="paywall"] { display: none !important; }
+body { overflow: auto !important; position: static !important; }`,
+    readable: `/* Readable text */
+body { font-family: Georgia, 'Times New Roman', serif !important; line-height: 1.65 !important; }
+p { max-width: 70ch; }`,
+    bigtext: `/* Bigger text */
+html { font-size: 120% !important; }`
+};
+
+// Import a previously exported JSON backup. Only domain-shaped keys with
+// string values are accepted; reserved `__ps_` keys and anything else are
+// skipped so a crafted file can't overwrite internal state.
+function importSnippets(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        let data;
+        try {
+            data = JSON.parse(String(reader.result));
+        } catch (_) {
+            showStatus('Import failed: not valid JSON.', 3000);
+            return;
+        }
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            showStatus('Import failed: expected an object of domain → CSS.', 3000);
+            return;
+        }
+        const valid = {};
+        let skipped = 0;
+        Object.keys(data).forEach((k) => {
+            const domainish = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(k);
+            if (isReservedKey(k) || !domainish || typeof data[k] !== 'string') { skipped++; return; }
+            valid[k] = data[k];
+        });
+        const count = Object.keys(valid).length;
+        if (!count) {
+            showStatus('Import: no valid snippets found in that file.', 3000);
+            return;
+        }
+        chrome.storage.local.set(valid, () => {
+            showStatus(`Imported ${count} snippet${count === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} entr${skipped === 1 ? 'y' : 'ies'}` : ''}.`, 3000);
+            reloadSnippets();
+            if (activeHost && typeof valid[activeHost] === 'string') {
+                document.getElementById('cssInput').value = valid[activeHost];
+            }
+        });
+    };
+    reader.onerror = () => showStatus('Import failed: could not read the file.', 3000);
+    reader.readAsText(file);
+}
+
 async function pickAndSaveMedia() {
     showStatus('Scanning page for video media…', 1500);
     const mediaUrls = await collectMediaSources();
@@ -479,6 +668,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (downloadVideoBtn) {
         downloadVideoBtn.addEventListener('click', pickAndSaveMedia);
     }
+    const previewBtn = document.getElementById('previewBtn');
+    if (previewBtn) previewBtn.addEventListener('click', previewCss);
+    const siteEnabled = document.getElementById('siteEnabled');
+    if (siteEnabled) siteEnabled.addEventListener('change', () => setSiteEnabled(siteEnabled.checked));
+    document.querySelectorAll('button.preset').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const css = CSS_PRESETS[btn.dataset.preset];
+            if (!css) return;
+            cssInput.value = (cssInput.value.trim() ? cssInput.value.replace(/\s*$/, '\n\n') : '') + css + '\n';
+            showStatus('Preset added to the editor — Preview or Save to apply.', 2500);
+        });
+    });
+    const screenshotBtn = document.getElementById('screenshotBtn');
+    if (screenshotBtn) screenshotBtn.addEventListener('click', captureScreenshot);
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+    if (importBtn && importFile) {
+        importBtn.addEventListener('click', () => importFile.click());
+        importFile.addEventListener('change', () => {
+            const file = importFile.files && importFile.files[0];
+            importFile.value = ''; // allow re-picking the same file
+            if (file) importSnippets(file);
+        });
+    }
     exportBtn.addEventListener('click', () => {
         chrome.storage.local.get(null, (items) => {
             // Export CSS snippets only — never the reserved `__ps_` keys, so
@@ -504,23 +717,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 document.addEventListener('DOMContentLoaded', () => {
   function startPick(tabId) {
-    chrome.tabs.sendMessage(tabId, { type: 'PS_START_PICK' }, (resp) => {
-      if (!chrome.runtime.lastError && resp) {
-        window.close();
-        return;
-      }
-      // The registered content script isn't reachable (e.g. the page was open
-      // before the extension was installed/reloaded). Inject it once, then retry.
-      injectFile(tabId, 'content.js').then(() => {
-        chrome.tabs.sendMessage(tabId, { type: 'PS_START_PICK' }, () => {
-          if (chrome.runtime.lastError) {
-            showStatus('Cannot inspect this page.', 3000);
-          } else {
-            window.close();
-          }
-        });
-      }).catch(() => showStatus('Cannot inspect this page.', 3000));
-    });
+    messageTab(tabId, { type: 'PS_START_PICK' })
+      .then(() => window.close())
+      .catch(() => showStatus('Cannot inspect this page.', 3000));
   }
   const inspectBtn = document.getElementById('inspectBtn');
   if (inspectBtn) {
@@ -551,11 +750,49 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch((err) => showStatus(`Cannot read this page: ${err.message || err}`, 3000));
     });
   }
+  const readPageBtn = document.getElementById('readPageBtn');
+  if (readPageBtn) {
+    readPageBtn.addEventListener('click', async () => {
+      const tab = await getActiveTab();
+      if (!tab || !tab.id) {
+        showStatus('No active tab detected.', 2500);
+        return;
+      }
+      // Prefer the page's main-content landmark so navigation chrome, menus,
+      // and footers aren't read out; cap the text so a huge page can't wedge
+      // the speech queue.
+      injectFunc(tab.id, () => {
+        const el = document.querySelector('article') ||
+          document.querySelector('main') ||
+          document.querySelector('[role="main"]') ||
+          document.body;
+        return el ? (el.innerText || '').slice(0, 60000) : '';
+      })
+        .then((results) => {
+          const text = results && results[0];
+          if (text && text.trim()) {
+            speak(text);
+            showStatus('Reading the page — tap Stop to end.', 2500);
+          } else {
+            showStatus('No readable text found on this page.', 2500);
+          }
+        })
+        .catch((err) => showStatus(`Cannot read this page: ${err.message || err}`, 3000));
+    });
+  }
+  const ttsRateEl = document.getElementById('ttsRate');
+  if (ttsRateEl) {
+    ttsRateEl.addEventListener('input', () => {
+      ttsRate = parseFloat(ttsRateEl.value) || 1;
+      const v = document.getElementById('ttsRateVal');
+      if (v) v.textContent = ttsRate.toFixed(1) + '×';
+    });
+  }
   const stopReadBtn = document.getElementById('stopReadBtn');
   if (stopReadBtn) {
-  stopReadBtn.addEventListener('click', () => {
-    // Immediately stop any ongoing speech:
-    speechSynthesis.cancel();
+    stopReadBtn.addEventListener('click', () => {
+      // Immediately stop any ongoing speech (and flush the chunk queue).
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
     });
   }
 });
