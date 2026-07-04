@@ -8,7 +8,7 @@
 
 ## What this is
 
-A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, a Web-Speech TTS reader for selected text, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, a **per-domain notepad** for private site notes, a **cryptographic password / passphrase generator**, and a **tab organizer** that sorts, groups by domain, de-duplicates, and lists your open tabs across every window.
+A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The Style editor includes a **live preview** (see the CSS on the page before saving), a **per-site on/off switch** (keep the snippet, skip the injection), and **quick presets** (dark mode, hide sticky/cookie bars, readable text, bigger text) as starting points. The CSS editor has line numbers, Tab / auto-indent handling, Ctrl/Cmd+S to save, and keeps an unsaved draft per domain so closing the popup mid-edit loses nothing. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, an **element hider** (tap anything on the page and a `display:none` rule is saved for the site instantly), a Web-Speech TTS reader for **selected text or the whole page** with an adjustable speed, a **one-tap screenshot** of the visible page, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, **JSON export and import** of all snippets, a **per-domain notepad** for private site notes, a **cryptographic password / passphrase generator**, and a **tab organizer** that sorts, groups by domain, de-duplicates, and lists your open tabs across every window.
 
 The UI is organized into collapsible sections (Style / Notes / Password / Tools / Tabs) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
 
@@ -26,15 +26,21 @@ The most common tasks. For anything not listed, see [Developer Setup](#developer
 | Open the editor on Chrome / Edge | Click the **Pageside** toolbar icon — the popup opens. |
 | Open the editor on Opera / Firefox | Open the browser **sidebar** and pick **Pageside**. |
 | Add CSS for a site | Visit the site, open the editor, type CSS, click **Save Style Changes**. |
+| Try CSS before saving | Type CSS, click **Preview on Page** — the page updates instantly. **Save** to keep it, reload the page to discard. |
+| Start from a template | Tap a preset (**Dark mode**, **Hide sticky/cookie bars**, **Readable text**, **Bigger text**) — it's appended to the editor for you to tune. |
+| Turn a site's CSS off temporarily | Untick **Apply style on this site** in the Style section. The snippet stays saved; tick again to re-apply. |
 | Remove CSS for a site | Visit the site, open the editor, click **Delete Style for this Page**. |
 | Copy a selector from the page | Click **Select Container**, hover over the element, click it. The selector is copied to the clipboard. |
-| Read selected text aloud | Select text on the page, open the editor, click **Read Selected Text**. |
+| Hide an element on a page | Click **Hide Element**, then tap the element — a `display:none` rule is saved for the site and applied instantly. Undo by deleting that line in the editor. |
+| Edit CSS comfortably | The editor shows line numbers; **Tab** indents (Shift+Tab outdents), **Enter** auto-indents, **Ctrl/Cmd+S** saves. Unsaved edits are restored as a draft next time you open the popup. |
+| Read text aloud | Select text and click **Read Selected Text**, or click **Read Whole Page** for the page's main content. Adjust the **Speed** slider; **Stop Reading** ends it. |
+| Screenshot the page | Open **Tools**, click **Screenshot Visible Page** — a PNG lands in your downloads. |
 | Download a `<video>` from a page | Either right-click the video on the page and choose **Download this video**, or open the editor and click **Download Video Media**. |
 | Keep a private note for a site | Open the **Notes** section, type — it auto-saves per domain (or tap **Save note**). |
 | Generate a strong password | Open the **Password** section, set the options, tap **Generate**, then **Copy**. |
 | Organize / sort open tabs | Open the **Tabs** section, pick a sort order and tap **Sort tabs**, **Group by domain** (Chrome desktop), or **Close duplicates**. Filter the list and click a tab to jump to it. |
 | Back up all snippets | Open the editor, click **Export JSON**. (Private notes are never included in the export.) |
-| Restore a snippet on another browser | Open the editor on the target site, paste the JSON value into the editor, **Save**. |
+| Restore a backup | Open the editor, click **Import JSON**, pick the exported file — snippets merge in (existing domains are overwritten, notes/internal state untouched). |
 
 ---
 

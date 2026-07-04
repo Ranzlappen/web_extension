@@ -15,27 +15,74 @@ if (!window.__ps_kx9w4_init) {
   (function () {
     try {
       const host = resolveBaseHost(window.location.hostname);
-      chrome.storage.local.get([host], (res) => {
-        if (res[host]) {
-          const node = document.createElement('style');
-          node.id = '__ps_kx9w4_style';
-          node.textContent = res[host];
-          document.documentElement.appendChild(node);
-        }
+      const STYLE_ID = '__ps_kx9w4_style';
+      const PREVIEW_ID = '__ps_kx9w4_prev';
+      // Reserved key: map of base-domain -> true for sites where the user has
+      // temporarily switched the saved CSS off without deleting it.
+      const OFF_KEY = '__ps_off';
+      let savedCss = '';
+      let siteOff = false;
+
+      // Single writer for the saved-CSS <style> node: (re)creates it when there
+      // is CSS to apply and the site isn't switched off, removes it otherwise —
+      // so Delete / toggle-off never leave an empty node behind.
+      function syncStyle() {
+        const old = document.getElementById(STYLE_ID);
+        if (old) old.remove();
+        if (!savedCss || siteOff) return;
+        const node = document.createElement('style');
+        node.id = STYLE_ID;
+        node.textContent = savedCss;
+        document.documentElement.appendChild(node);
+      }
+      function clearPreview() {
+        const prev = document.getElementById(PREVIEW_ID);
+        if (prev) prev.remove();
+      }
+
+      chrome.storage.local.get([host, OFF_KEY], (res) => {
+        savedCss = res[host] || '';
+        siteOff = !!((res[OFF_KEY] || {})[host]);
+        syncStyle();
       });
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && changes[host]) {
-          // Skip re-injection when the value didn't actually change (e.g. an
-          // unrelated key was written in the same set() call).
-          if (changes[host].newValue === changes[host].oldValue) return;
-          const oldNode = document.getElementById('__ps_kx9w4_style');
-          if (oldNode) oldNode.remove();
-          const nextNode = document.createElement('style');
-          nextNode.id = '__ps_kx9w4_style';
-          nextNode.textContent = changes[host].newValue || '';
-          document.documentElement.appendChild(nextNode);
+        if (areaName !== 'local') return;
+        let dirty = false;
+        // Skip re-injection when the value didn't actually change (e.g. an
+        // unrelated key was written in the same set() call).
+        if (changes[host] && changes[host].newValue !== changes[host].oldValue) {
+          savedCss = changes[host].newValue || '';
+          clearPreview(); // a save/delete supersedes any live preview
+          dirty = true;
         }
+        if (changes[OFF_KEY]) {
+          const next = !!((changes[OFF_KEY].newValue || {})[host]);
+          if (next !== siteOff) { siteOff = next; dirty = true; }
+        }
+        if (dirty) syncStyle();
       });
+
+      // Live preview: the popup sends the editor's CSS without saving it. The
+      // preview node replaces the saved node (so deleted rules disappear too)
+      // and lasts until the next save/delete or a page reload.
+      if (chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+          if (!msg || msg.type !== 'PS_PREVIEW') return;
+          if (typeof msg.css === 'string' && msg.css.trim()) {
+            const old = document.getElementById(STYLE_ID);
+            if (old) old.remove();
+            clearPreview();
+            const node = document.createElement('style');
+            node.id = PREVIEW_ID;
+            node.textContent = msg.css;
+            document.documentElement.appendChild(node);
+          } else {
+            clearPreview();
+            syncStyle();
+          }
+          if (sendResponse) sendResponse({ ok: true });
+        });
+      }
     } catch (e) { console.error('style injection error:', e); }
   })();
 
@@ -57,6 +104,7 @@ if (!window.__ps_kx9w4_init) {
     window.addEventListener('focus', recordLastHost);
 
     let pickerActive = false;
+    let pickerMode = 'copy'; // 'copy' → selector to clipboard; 'hide' → save a display:none rule
     let pickerFrame = null;
     let pickerLabel = null;
     let pickerLinger = null;
@@ -69,6 +117,54 @@ if (!window.__ps_kx9w4_init) {
         if (cls.length) return '.' + cls.join('.');
       }
       return el.tagName.toLowerCase();
+    }
+
+    function cssEscape(s) {
+      return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
+    }
+
+    // Hide mode needs a selector that matches ONLY the picked element — a bare
+    // tag/class (fine as a copy hint) could blank half the page. Climb from the
+    // element, disambiguating repeated siblings with :nth-of-type, and stop as
+    // soon as the child chain matches exactly one node (or an id anchors it).
+    function preciseSelectorFor(el) {
+      const parts = [];
+      let node = el;
+      while (node && node.nodeType === 1 && node.tagName.toLowerCase() !== 'html') {
+        if (node.id) { parts.unshift('#' + cssEscape(node.id)); break; }
+        let part = node.tagName.toLowerCase();
+        if (typeof node.className === 'string') {
+          const cls = node.className.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+          if (cls.length) part += '.' + cls.map(cssEscape).join('.');
+        }
+        const parent = node.parentElement;
+        if (parent) {
+          const same = Array.prototype.filter.call(parent.children, (s) => s.tagName === node.tagName);
+          if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(node) + 1) + ')';
+        }
+        parts.unshift(part);
+        try { if (document.querySelectorAll(parts.join(' > ')).length === 1) break; } catch (_) { /* keep climbing */ }
+        node = parent;
+      }
+      return parts.join(' > ');
+    }
+
+    // Append a hide rule to this domain's saved CSS. The storage change makes
+    // the injector re-apply the style, so the element disappears immediately
+    // (unless the site's CSS is toggled off). Undo = delete the line in the
+    // popup editor.
+    function appendHideRule(selector, done) {
+      try {
+        const h = resolveBaseHost(window.location.hostname);
+        const rule = selector + ' { display: none !important; }';
+        chrome.storage.local.get([h], (res) => {
+          const cur = typeof res[h] === 'string' ? res[h] : '';
+          const next = cur.trim() ? cur.replace(/\s*$/, '\n') + rule + '\n' : rule + '\n';
+          chrome.storage.local.set({ [h]: next }, () => {
+            done(!(chrome.runtime && chrome.runtime.lastError));
+          });
+        });
+      } catch (_) { done(false); }
     }
 
     function styleLabel(node) {
@@ -110,7 +206,8 @@ if (!window.__ps_kx9w4_init) {
     // the classic hover-to-preview, click-to-copy behavior.
     const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
-    function enterPickerMode() {
+    function enterPickerMode(mode) {
+      pickerMode = mode === 'hide' ? 'hide' : 'copy';
       if (pickerActive) return;
       pickerActive = true;
       buildPickerOverlay();
@@ -154,7 +251,8 @@ if (!window.__ps_kx9w4_init) {
       pickerFrame.style.width = rect.width + 'px';
       pickerFrame.style.height = rect.height + 'px';
       if (!pickerLabel.dataset.copied) {
-        pickerLabel.textContent = (coarsePointer ? 'tap to copy ' : 'click to copy ') + selectorFor(el);
+        const verb = pickerMode === 'hide' ? 'hide' : 'copy';
+        pickerLabel.textContent = (coarsePointer ? 'tap to ' : 'click to ') + verb + ' ' + selectorFor(el);
       }
       positionLabel(e.clientX, e.clientY);
     }
@@ -165,6 +263,23 @@ if (!window.__ps_kx9w4_init) {
       e.stopPropagation();
       const el = elementUnder(e.clientX, e.clientY);
       if (!el) { exitPickerMode(); return; }
+      if (pickerMode === 'hide') {
+        const sel = preciseSelectorFor(el);
+        appendHideRule(sel, (ok) => {
+          ensureLabel();
+          pickerLabel.textContent = ok
+            ? `Hidden — rule saved for this site (delete the "${sel}" line in the editor to undo).`
+            : 'Could not save the hide rule.';
+          pickerLabel.dataset.copied = 'true';
+          positionLabel(e.clientX, e.clientY);
+          exitPickerMode(false);
+          clearTimeout(pickerLinger);
+          pickerLinger = setTimeout(() => {
+            if (pickerLabel) { pickerLabel.remove(); pickerLabel = null; }
+          }, 4500);
+        });
+        return;
+      }
       const text = selectorFor(el);
       copyText(text).then((ok) => {
         ensureLabel();
@@ -210,7 +325,7 @@ if (!window.__ps_kx9w4_init) {
 
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg && msg.type === 'PS_START_PICK') {
-        enterPickerMode();
+        enterPickerMode(msg.mode);
         if (sendResponse) sendResponse({ ok: true });
       }
     });
