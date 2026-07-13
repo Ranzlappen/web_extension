@@ -2,9 +2,14 @@
 
 Everything needed to publish Pageside to the Chrome Web Store. Copy-paste the
 text blocks below into the Developer Dashboard fields. The upload artifact is
-the **MV3 zip** built by `release.yml` (`pageside-<version>.zip`) — download it
-from the GitHub Release assets, **not** from the Actions artifacts UI (which
-double-wraps the zip).
+the **store zip** built by `release.yml` (`pageside-<version>-store.zip`) —
+download it from the GitHub Release assets, **not** from the Actions artifacts
+UI (which double-wraps the zip). The store build is derived from the source by
+`tools/build-store-package.mjs`: the Capture (screenshot) and Media (video
+download) features are stripped, the unused `downloads` / `contextMenus`
+permissions and the background worker are removed, and the Opera/Firefox-only
+manifest keys are dropped. Those features remain in the regular
+`pageside-<version>.zip` for self-hosted installs.
 
 ---
 
@@ -19,62 +24,73 @@ double-wraps the zip).
 
 ## 2. Upload
 
-1. Dashboard → **Items** → **New item** → upload `pageside-<version>.zip`.
-2. The manifest may produce non-blocking warnings for `sidebar_action` and
-   `browser_specific_settings` (Opera/Firefox keys that Chrome ignores).
-   Warnings do not block publication. If the upload is *rejected* over
-   `background.scripts`, remove that key (keep `service_worker`) from the
-   manifest in a store-only copy of the zip and re-upload.
+1. Dashboard → **Items** → **New item** → upload `pageside-<version>-store.zip`.
+2. The store manifest is pre-trimmed for Chrome (no `sidebar_action`,
+   `browser_specific_settings`, or `background` keys), so the upload should
+   produce no manifest warnings.
 
 ## 3. Store listing tab
 
 **Title:** `Pageside`
 
-**Short description** (132-char limit):
+**Short description** (132-char limit — matches the store manifest
+description set by `tools/build-store-package.mjs`):
 
-> Per-site custom CSS with live preview, an element hider, text-to-speech
-> reader, page tools, and a tab organizer. 100% local.
+> Per-site custom CSS with live preview, element picker and hider,
+> text-to-speech reader, site notes, and a tab organizer.
 
 **Category:** Productivity → Developer Tools (or Accessibility — pick one;
 Developer Tools fits the CSS editor best).
 
 **Language:** English
 
-**Detailed description:**
+**Detailed description** (deliberately frames every feature as one purpose —
+a per-site companion panel — so the parts read as facets of the same tool,
+not a grab-bag):
 
 ```
-Pageside lets you restyle any website with your own CSS — and keeps a small
-toolbox of page utilities one click away. Everything runs and stays on your
-device: no account, no server, no tracking.
+Pageside is a per-site companion panel: everything it does is organized
+around the website you are currently viewing. Open the panel on a site and
+you get your custom look for that site, your private notes about that site,
+reading tools for that page, and quick ways to hop between the site's open
+tabs. Everything runs and stays on your device: no account, no server, no
+tracking.
 
-STYLE ANY SITE
-• Write CSS for the current site; it re-applies automatically on every visit
-• Live preview before saving, per-site on/off switch, quick-start presets
-  (dark mode, hide sticky/cookie bars, readable text, bigger text)
-• Editor with line numbers, Tab indentation, Ctrl/Cmd+S, and automatic
-  draft recovery
-• Element picker: click any element to copy its CSS selector — or use Hide
-  Element to remove it from the site permanently with one tap
-• Export and import all your snippets as JSON
+MAKE ANY SITE LOOK THE WAY YOU WANT
+• Write CSS for the current site; Pageside remembers it and re-applies it
+  automatically on every future visit
+• Live preview before saving, a per-site on/off switch, and quick-start
+  presets: dark mode, hide sticky/cookie bars, readable text, bigger text
+• A proper little editor: line numbers, Tab indentation, Ctrl/Cmd+S to
+  save, and automatic draft recovery if you close the panel mid-edit
+• Element picker: tap any element on the page to copy its exact CSS
+  selector into your clipboard, ready to style
+• Hide Element: tap anything — a cookie bar, a floating video, a nag
+  banner — and it's gone from that site permanently (one saved CSS rule
+  you can undo anytime)
+• Back up every site's styles to a JSON file and restore them anywhere
 
-READ & CAPTURE
-• Text-to-speech: read the selected text or the whole page aloud, with an
-  adjustable speed slider
-• One-tap screenshot of the visible page, saved to your downloads
-• Save page media: scan the current tab for <video> sources and download
-  them through the browser's download manager, or right-click any video and
-  choose "Download this video"
+READ THE PAGE YOUR WAY
+• Text-to-speech for the page you're on: read the selected text or the
+  whole article aloud, with an adjustable speed slider — hands-free
+  reading for long pages
 
-SMALL EXTRAS
-• Per-site private notepad (stored locally, excluded from exports)
-• Cryptographic password & passphrase generator (nothing is ever stored)
-• Tab organizer: sort tabs, group by domain, close duplicates, and jump to
-  any open tab across windows
+KEEP YOUR CONTEXT ON EVERY SITE
+• A private notepad per site: jot down anything — it auto-saves, stays on
+  your device, and reappears whenever you're back on that site
+• Signing up on a site? Generate a strong password or passphrase right in
+  the panel (cryptographic RNG, live strength meter). Nothing is ever
+  stored — copy it into your password manager and it's gone
 
-PRIVACY
-Pageside has no server and sends nothing anywhere. Snippets, notes, and
-settings live only in your browser's local extension storage. See the
-privacy policy for details.
+MOVE BETWEEN YOUR SITES
+• Tab organizer: sort your open tabs by domain, title, or URL; group
+  same-site tabs together; close duplicates; filter and jump to any tab
+  across all windows
+
+PRIVACY, PLAINLY
+Pageside has no server and sends nothing anywhere. Your styles, notes, and
+settings live only in your browser's local extension storage — uninstall
+the extension and they're gone. No analytics, no accounts, no remote code.
 ```
 
 **Graphic assets:**
@@ -90,10 +106,14 @@ privacy policy for details.
 
 **Single purpose description:**
 
-> Pageside's single purpose is customizing and interacting with the page you
-> are viewing: applying user-authored per-site CSS, and offering related
-> on-page utilities (element picker, read-aloud, screenshot, media saver,
-> per-site notes) plus tab organization, all operating locally.
+> Pageside's single purpose is to be a per-site companion panel: it lets the
+> user customize and manage their experience of the website they are
+> currently viewing. Every feature operates on the current site — applying
+> the user's own saved CSS to it (with an element picker/hider to build
+> those styles), reading its content aloud, keeping the user's private notes
+> for it, generating a password when registering on it, and organizing the
+> browser's open tabs to move between sites. All data is stored locally;
+> nothing is transmitted.
 
 **Permission justifications** (one field per permission):
 
@@ -104,9 +124,7 @@ privacy policy for details.
 | `scripting` | Injects the small helper functions that power the popup-initiated actions above into the active tab. No remote code; all scripts ship in the package. |
 | `tabs` | Reads the active tab's URL to detect which site's CSS snippet to load in the editor, and powers the tab organizer (sort, group, close duplicates, jump to tab). Tab data is used in-memory only. |
 | `tabGroups` | Used solely by the tab organizer's optional "Group by domain" action to create native tab groups on Chrome desktop. |
-| `downloads` | Saves user-requested screenshots and page media files through the browser's download manager. Downloads occur only on explicit user action. |
 | `clipboardWrite` | Copies a CSS selector or a generated password to the clipboard when the user presses a Copy button. |
-| `contextMenus` | Adds the right-click "Download this video" entry on video elements. |
 | Host permission `<all_urls>` | The core feature applies the user's saved CSS to sites as they load; the content script must run at document_start on any site the user has styled. It reads only the page's hostname to look up the user's snippet and injects only the user's own CSS. |
 
 **Remote code:** answer **No** — all code is packaged; there is no remote
@@ -143,7 +161,7 @@ GitHub Pages or a public Gist and use that URL instead).
 ## 7. Updates after first publish
 
 For each new version: run the **Release** workflow (patch/minor/major) →
-download `pageside-<version>.zip` from the GitHub Release → dashboard →
+download `pageside-<version>-store.zip` from the GitHub Release → dashboard →
 **Package** → **Upload new package** → **Submit for review**. Listing text
 and screenshots only need touching when features change.
 
@@ -152,12 +170,16 @@ and screenshots only need touching when features change.
 * **Broad host access** — justified above; the reviewer may ask why
   `activeTab` alone isn't enough. Answer: saved CSS must re-apply on page
   load *without* a popup click, which requires a content script on all URLs.
-* **Single-purpose policy** — the password generator and tab organizer are
-  the furthest from the core purpose. If a rejection cites "multiple
-  unrelated functionalities", the fallback is shipping those two sections
-  behind a settings toggle or removing them from the store build.
-* **Media saver wording** — never market it as a "video downloader" for
-  copyrighted/streaming content. It cannot download DRM or blob streams
-  (they are explicitly skipped), and the listing copy above frames it as
-  saving page media via the browser's own download manager. Do not mention
-  YouTube anywhere in the listing.
+* **Single-purpose policy** — mitigated three ways: the Capture/Media
+  features (the riskiest, least-related surface) are stripped from the store
+  build entirely; the listing copy frames every remaining feature as a facet
+  of one per-site companion panel; and the single-purpose statement above
+  says so explicitly. If a rejection still cites "multiple unrelated
+  functionalities", the next fallback is stripping the password generator
+  and tab organizer from the store build too (extend the
+  `__PS_STORE_STRIP__` markers — see `tools/build-store-package.mjs`).
+* **Do not re-add media downloading to the store build.** Chrome Web Store
+  policy prohibits extensions that facilitate downloading streaming media,
+  and YouTube-targeted extraction was deliberately removed from the source.
+  The Capture/Media features live on only in the self-hosted
+  `pageside-<version>.zip` / `-kiwi.zip` builds.

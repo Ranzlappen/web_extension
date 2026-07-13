@@ -4,8 +4,9 @@ _Last updated: 2026-07-13_
 
 Pageside is a browser extension that lets you save a custom CSS snippet per
 website, plus a small set of page tools (element picker, text-to-speech
-reader, screenshot, media saver, per-site notepad, password generator, and
-tab organizer).
+reader, per-site notepad, password generator, and tab organizer; the
+self-hosted builds distributed on GitHub additionally include a page
+screenshot and a page-media saver).
 
 ## The short version
 
@@ -50,9 +51,9 @@ your device unless you move it yourself.
 | `activeTab` / `scripting` | Running the element picker, text-to-speech reader, screenshot, and media scanner on the current tab — only when you click those buttons in the popup. |
 | `tabs` | Detecting the current site's domain, and powering the optional tab organizer (sort / group / close duplicates). Tab titles and URLs are read in-memory only and never stored or transmitted. |
 | `tabGroups` | The optional "Group by domain" tab-organizer action (Chrome desktop only). |
-| `downloads` | Saving screenshots and page media through the browser's own download manager, at your explicit request. |
 | `clipboardWrite` | Copying a CSS selector or a generated password to your clipboard when you press Copy. |
-| `contextMenus` | The right-click "Download this video" menu entry. |
+| `downloads` *(self-hosted builds only — not in the Chrome Web Store package)* | Saving screenshots and page media through the browser's own download manager, at your explicit request. |
+| `contextMenus` *(self-hosted builds only — not in the Chrome Web Store package)* | The right-click "Download this video" menu entry. |
 
 ## Changes to this policy
 

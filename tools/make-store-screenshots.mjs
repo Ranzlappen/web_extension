@@ -11,6 +11,7 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import os from 'node:os';
 
 // Resolve playwright from the local project if present, else the global root.
@@ -24,9 +25,13 @@ try {
 }
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const EXT = resolve(ROOT, 'domain-css-injector-v2');
 const OUT = resolve(ROOT, 'store', 'screenshots');
 mkdirSync(OUT, { recursive: true });
+
+// Screenshot the STORE build (Capture/Media stripped), not the full source —
+// the store listing must show exactly what the reviewer installs.
+const EXT = resolve(os.tmpdir(), `pageside-store-pkg-${process.pid}`);
+execSync(`node ${JSON.stringify(resolve(ROOT, 'tools', 'build-store-package.mjs'))} ${JSON.stringify(EXT)}`, { stdio: 'inherit' });
 
 const DEMO_CSS = `/* example.com — my theme */
 body {
@@ -57,8 +62,8 @@ const SHOTS = [
   {
     file: '02-tools.png',
     open: ['Tools'],
-    headline: 'Read aloud, capture, and save media',
-    sub: 'Text-to-speech for any page, one-tap screenshots, page media downloads, and JSON backup of all your snippets.'
+    headline: 'Have any page read aloud',
+    sub: 'Text-to-speech for the selected text or the whole page, with adjustable speed — plus one-click JSON backup and restore of all your site styles.'
   },
   {
     file: '03-password.png',
@@ -84,9 +89,11 @@ const context = await chromium.launchPersistentContext(userDataDir, {
 });
 
 try {
-  let [worker] = context.serviceWorkers();
-  if (!worker) worker = await context.waitForEvent('serviceworker');
-  const extId = new URL(worker.url()).host;
+  // The store build has no background worker to discover the ID from, but an
+  // unpacked extension's ID is deterministic: SHA-256 of its absolute path,
+  // first 16 bytes, hex digits mapped to a-p.
+  const extId = crypto.createHash('sha256').update(EXT).digest('hex')
+    .slice(0, 32).replace(/[0-9a-f]/g, (c) => String.fromCharCode(97 + parseInt(c, 16)));
 
   // A few real tabs so the Tabs organizer list has content.
   for (const url of ['https://example.com/', 'https://www.wikipedia.org/', 'https://github.com/']) {
@@ -97,7 +104,8 @@ try {
   }
 
   const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extId}/popup.html`);
+  const resp = await popup.goto(`chrome-extension://${extId}/popup.html`);
+  if (!resp || !resp.ok()) throw new Error(`popup.html did not load — computed extension id ${extId} wrong?`);
   await popup.evaluate((seed) => chrome.storage.local.set(seed), SEED);
   await popup.reload();
   await popup.waitForTimeout(1200);
@@ -147,7 +155,10 @@ try {
         color: #e6e8ef; display: flex; align-items: center; }
       .text { flex: 1 1 auto; padding: 0 48px 0 72px; }
       .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 34px; }
-      .brand img { width: 48px; height: 48px; border-radius: 10px; }
+      /* The icon PNG has a solid dark square background (no alpha), so frame
+         it as a deliberate rounded app-icon tile instead of a bare image. */
+      .brand img { width: 56px; height: 56px; border-radius: 14px;
+        border: 1px solid #2f3854; box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 22px rgba(74,163,255,.18); }
       .brand span { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
       h1 { font-size: 44px; line-height: 1.15; margin-bottom: 22px; font-weight: 800; }
       p { font-size: 21px; line-height: 1.5; color: #aab3c5; max-width: 560px; }
@@ -176,4 +187,5 @@ try {
 } finally {
   await context.close();
   rmSync(userDataDir, { recursive: true, force: true });
+  rmSync(EXT, { recursive: true, force: true });
 }

@@ -207,7 +207,7 @@ There is no build step. Edit a file, then click **Reload** on the extension card
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | [`ci.yml`](./.github/workflows/ci.yml) | PR / push touching `domain-css-injector-v2/**` | Validates `manifest.json`, syntax-checks the JS files, and confirms required icon assets exist. |
-| [`release.yml`](./.github/workflows/release.yml) | tag push `v*` or manual dispatch | Validates, then builds **two** zips — `pageside-<version>.zip` (Manifest V3, desktop) and `pageside-<version>-kiwi.zip` (Manifest V2, Kiwi / Android) — uploads them as workflow artifacts and attaches both to the GitHub Release. |
+| [`release.yml`](./.github/workflows/release.yml) | tag push `v*` or manual dispatch | Validates, then builds **three** zips — `pageside-<version>.zip` (Manifest V3, desktop), `pageside-<version>-kiwi.zip` (Manifest V2, Kiwi / Android), and `pageside-<version>-store.zip` (Chrome Web Store build with Capture/Media stripped) — uploads them as workflow artifacts and attaches all three to the GitHub Release. |
 
 ---
 
@@ -247,6 +247,12 @@ Not sure what to type? These are the most common one-liners. Use **Select Contai
 ---
 
 ## How to download a video from a page
+
+> ℹ️ **Self-hosted builds only.** The Capture (screenshot) and Media (video
+> download) features ship in the GitHub builds (`pageside-<version>.zip`,
+> `-kiwi.zip`, and unpacked installs from this repo) but are **not included
+> in the Chrome Web Store package**, which is derived with those sections
+> stripped (see `tools/build-store-package.mjs`).
 
 There are two ways to grab a video, both of which use the same `chrome.downloads` pipeline (`conflictAction: 'uniquify'`, blob streams skipped — they cannot be downloaded directly):
 

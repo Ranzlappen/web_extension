@@ -1,10 +1,14 @@
 let activeHost = null;
 let ttsVoice;
 let ttsRate = 1;
-let mediaCandidates = [];
 // Reserved key: map of base-domain -> true for sites where the saved CSS is
 // temporarily switched off (content.js skips injection while set).
 const OFF_KEY = '__ps_off';
+
+/* __PS_STORE_STRIP_START__ — Capture/Media: excluded from the Web Store build
+   by tools/build-store-package.mjs. Keep every media/screenshot-only symbol
+   inside a strip region so the stripped file still parses. */
+let mediaCandidates = [];
 
 function normalizeUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -20,6 +24,7 @@ function normalizeUrl(rawUrl) {
 function looksLikeMedia(url) {
     return /\.(mp4|webm|m4v|mov|m3u8|mpd|mkv|avi|flv|wmv)(\?|#|$)/i.test(url);
 }
+/* __PS_STORE_STRIP_END__ */
 
 // Voice lists load asynchronously and are frequently empty on mobile
 // Chromium until the engine warms up, so pick defensively and never hard-depend
@@ -331,6 +336,7 @@ async function detectActiveHost({ retries = 4, delay = 300 } = {}) {
     return false;
 }
 
+/* __PS_STORE_STRIP_START__ — media scanner / downloader (not in store build) */
 async function collectMediaSources() {
     const tab = await getActiveTab();
     if (!tab || !tab.id) {
@@ -479,6 +485,7 @@ function renderMediaCandidates(list) {
         container.appendChild(btn);
     });
 }
+/* __PS_STORE_STRIP_END__ */
 
 // Send a message to the tab's content script, injecting content.js once and
 // retrying when the registered instance isn't reachable (e.g. the page was
@@ -518,6 +525,7 @@ async function previewCss() {
     }
 }
 
+/* __PS_STORE_STRIP_START__ — screenshot capture (not in store build) */
 // One-tap screenshot of the visible tab, saved through the native download
 // manager. Needs no extra permission: activeTab / <all_urls> already cover
 // captureVisibleTab, and downloads is held for the media saver.
@@ -545,6 +553,7 @@ function captureScreenshot() {
         });
     });
 }
+/* __PS_STORE_STRIP_END__ */
 
 // Starting-point CSS templates appended into the editor (never auto-saved) —
 // the user tunes the selectors per site, then Previews / Saves.
@@ -604,6 +613,7 @@ function importSnippets(file) {
     reader.readAsText(file);
 }
 
+/* __PS_STORE_STRIP_START__ — media scan entry point (not in store build) */
 async function pickAndSaveMedia() {
     showStatus('Scanning page for video media…', 1500);
     const mediaUrls = await collectMediaSources();
@@ -613,6 +623,7 @@ async function pickAndSaveMedia() {
         showStatus(`Found ${mediaUrls.length} media source(s). Tap one to download.`, 3000);
     }
 }
+/* __PS_STORE_STRIP_END__ */
 // React to tab switches/navigations instantly where the events fire; the
 // interval poll below stays as a low-frequency fallback for environments
 // (some mobile Chromium builds) where these events are unreliable.
@@ -639,7 +650,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const deleteBtn = document.getElementById('deleteBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
     const domainInfo = document.getElementById('domainInfo');
     const runDetect = () => {
         domainInfo.textContent = 'Detecting site…';
@@ -655,9 +665,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveBtn.addEventListener('click', () => persistCss(cssInput.value));
     deleteBtn.addEventListener('click', dropCss);
     refreshBtn.addEventListener('click', reloadSnippets);
+    /* __PS_STORE_STRIP_START__ — Capture/Media button wiring (not in store build) */
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
     if (downloadVideoBtn) {
         downloadVideoBtn.addEventListener('click', pickAndSaveMedia);
     }
+    const screenshotBtn = document.getElementById('screenshotBtn');
+    if (screenshotBtn) screenshotBtn.addEventListener('click', captureScreenshot);
+    /* __PS_STORE_STRIP_END__ */
     const previewBtn = document.getElementById('previewBtn');
     if (previewBtn) previewBtn.addEventListener('click', previewCss);
     const siteEnabled = document.getElementById('siteEnabled');
@@ -670,8 +685,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             showStatus('Preset added to the editor — Preview or Save to apply.', 2500);
         });
     });
-    const screenshotBtn = document.getElementById('screenshotBtn');
-    if (screenshotBtn) screenshotBtn.addEventListener('click', captureScreenshot);
     const importBtn = document.getElementById('importBtn');
     const importFile = document.getElementById('importFile');
     if (importBtn && importFile) {
