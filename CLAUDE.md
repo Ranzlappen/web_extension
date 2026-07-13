@@ -31,6 +31,8 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 * **Identifier surface is deliberately neutral.** The extension `name`, the injected `<style>` element id (`__ps_kx9w4_style`), the runtime DOM additions, and the message-channel types (`PS_START_PICK`, …) are intentionally generic / randomized so anti-extension detection scripts can't fingerprint the extension by name or marker. If you change one, change the other end of the channel too.
 * **Dual manifest: MV3 desktop, MV2 for Kiwi/Android.** `manifest.json` is Manifest V3 (the Chrome Web Store / AMO contract and the desktop target). Kiwi and other Android Chromium forks only support MV2 reliably — they **silently fail to load** an MV3 manifest — so the mobile build ships as Manifest V2. The MV2 manifest is **derived** from `manifest.json` by `tools/build-kiwi-manifest.mjs` (single source of truth; never hand-maintain a second manifest), and `tools/build-kiwi-zip.sh` packages the `-kiwi.zip`. The **same JS runs under both**: `popup.js` feature-detects `chrome.scripting` (MV3) vs `chrome.tabs.executeScript` (MV2) via the `injectFunc()` / `injectFile()` helpers — use those, never call `chrome.scripting` directly. `background.js` uses only APIs (`contextMenus`, `downloads`) that exist in both. CI validates the derived MV2 manifest stays in parity (version/name) and well-formed.
 * **Permissions are intentionally narrow.** Active operations use `activeTab` + `scripting` so the extension only touches a tab when the user opens the popup. `contextMenus` is held by the background service worker only, for the right-click "Download this video" entry. `tabs` backs both the active-site detection and the **Tabs** organizer (sort / dedupe / list across windows). `tabGroups` backs only the organizer's _Group by domain_ action — it is **Chrome/Edge-desktop only**, feature-detected at runtime (`typeof chrome.tabs.group === 'function'`), and **stripped from the MV2 (Kiwi) build** by `tools/build-kiwi-manifest.mjs` (Kiwi/Firefox have no tab-groups API). Don't expand host access further without a feature that requires it.
+* **Media saver stays site-generic.** The video pipeline may only surface generic sources (`<video>`/`<source>` src, media-typed links, performance resource entries) and must never carry site-specific extraction (e.g. YouTube player-response parsing) — Chrome Web Store policy prohibits facilitating YouTube downloads and that code was deliberately removed before the store submission. Don't reintroduce it.
+* **Derived Chrome Web Store build.** The store package (`pageside-<version>-store.zip`) is derived from the source by `tools/build-store-package.mjs`: every region fenced by `__PS_STORE_STRIP_START__` / `__PS_STORE_STRIP_END__` markers (JS block comments in `popup.js`, HTML + CSS comments in `popup.html`) is removed — currently the whole Capture (screenshot) and Media (video download) surface — along with `background.js`, the `downloads` / `contextMenus` permissions, and the Opera/Firefox-only manifest keys (`sidebar_action`, `browser_specific_settings`, `background`); the manifest `description` is overridden to omit the media saver. When touching Capture/Media code, keep it inside the strip markers; the build script fails loudly if a stripped symbol leaks outside a fenced region. CI validates the derived package on every push. Store listing copy and the submission guide live in `store/chrome-web-store.md`.
 * **No external network.** Snippets are local-only. There is no telemetry, no remote config, no auth. Adding a network call is a structural change and should be a separate PR.
 * **Vanilla JS, no dependencies.** No npm, no bundler. Keep it that way unless a feature genuinely cannot be done without a dep.
 
@@ -38,8 +40,8 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 
 | Workflow | Trigger | Scope | Deploys |
 | --- | --- | --- | --- |
-| `ci.yml` | PR / push touching `domain-css-injector-v2/**`, `tools/**`, or workflow itself | Validates `manifest.json`, runs `node --check` over each `.js`, confirms icon assets exist, and validates the derived Kiwi MV2 manifest (version/name parity, MV2 shape) | Nothing (validation only) |
-| `release.yml` | tag push `v*` or manual dispatch | Validates, then builds **two** zips: `pageside-<version>.zip` (Manifest V3, desktop) and `pageside-<version>-kiwi.zip` (Manifest V2 for Kiwi / Android, derived via `tools/build-kiwi-zip.sh`); verifies `manifest.json` lands at each zip root | Uploads both as workflow artifacts and attaches both to a GitHub Release. **Manual dispatch auto-increments**: pick `patch`/`minor`/`major` and the workflow bumps `manifest.json`, commits the bump `[skip ci]`, pushes the `vX.Y.Z` tag, and publishes the Release — no manual version edit or tagging. Tag pushes release at that exact tag with no bump. |
+| `ci.yml` | PR / push touching `domain-css-injector-v2/**`, `tools/**`, or workflow itself | Validates `manifest.json`, runs `node --check` over each `.js`, confirms icon assets exist, validates the derived Kiwi MV2 manifest (version/name parity, MV2 shape), and validates the derived Chrome Web Store package (strip integrity, trimmed permissions/keys) | Nothing (validation only) |
+| `release.yml` | tag push `v*` or manual dispatch | Validates, then builds **three** zips: `pageside-<version>.zip` (Manifest V3, desktop), `pageside-<version>-kiwi.zip` (Manifest V2 for Kiwi / Android, derived via `tools/build-kiwi-zip.sh`), and `pageside-<version>-store.zip` (Chrome Web Store build, derived via `tools/build-store-zip.sh` with Capture/Media stripped); verifies `manifest.json` lands at each zip root | Uploads both as workflow artifacts and attaches both to a GitHub Release. **Manual dispatch auto-increments**: pick `patch`/`minor`/`major` and the workflow bumps `manifest.json`, commits the bump `[skip ci]`, pushes the `vX.Y.Z` tag, and publishes the Release — no manual version edit or tagging. Tag pushes release at that exact tag with no bump. |
 
 **What fires on a given change:**
 
@@ -86,13 +88,20 @@ opera/
 │   └── icons/                   # 16 / 48 / 128 px PNGs
 ├── tools/
 │   ├── build-kiwi-manifest.mjs  # derives the MV2 (Kiwi) manifest from manifest.json
-│   └── build-kiwi-zip.sh        # builds pageside-<version>-kiwi.zip locally
+│   ├── build-kiwi-zip.sh        # builds pageside-<version>-kiwi.zip locally
+│   ├── build-store-package.mjs  # derives the Chrome Web Store package (strips Capture/Media)
+│   ├── build-store-zip.sh       # builds pageside-<version>-store.zip locally
+│   └── make-store-screenshots.mjs # regenerates store/screenshots/ via Playwright (dev-only)
+├── store/
+│   ├── chrome-web-store.md      # Web Store listing copy, permission justifications, publish guide
+│   └── screenshots/             # generated 1280×800 store screenshots
 ├── .github/
 │   ├── dependabot.yml           # weekly GitHub Actions updates
 │   └── workflows/
 │       ├── ci.yml               # validation
 │       └── release.yml          # zip + GitHub Release on v* tag
 ├── pwa-inventory.md             # storage / manifest inventory
+├── PRIVACY.md                   # privacy policy — linked from the Web Store listing
 ├── README.md                    # user-facing docs
 ├── CLAUDE.md                    # this file
 └── LICENSE                      # MIT

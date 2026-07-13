@@ -30,10 +30,12 @@
         .kv{font-family:monospace;white-space:pre-wrap;padding:8px 0}
         .controls{display:flex;gap:6px;flex-wrap:wrap}
         .controls button{flex:1 1 120px;width:auto;border-radius:10px}
+        /* __PS_STORE_STRIP_START__ — media list styles (not in store build) */
         #mediaList{margin-top:8px}
         #mediaList:empty{display:none}
         .media-item{display:block;text-align:left}
         .media-title{display:block;font-weight:bold}
+        /* __PS_STORE_STRIP_END__ */
         /* Native collapsible sections — zero JS, keyboard-accessible, touch-friendly. */
         .sec{border:1px solid #2a2f44;border-radius:10px;margin:8px 0;background:#11151f;overflow:hidden}
         .sec>summary{list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;
@@ -148,6 +150,7 @@ body    {style:example;}
                     <button id="stopReadBtn">Stop Reading</button>
                 </div>
                 <label class="opt"><span style="flex:0 0 auto">Speed: <span id="ttsRateVal">1.0×</span></span><input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1"></label>
+                <!-- __PS_STORE_STRIP_START__ — Capture/Media UI (not in store build) -->
                 <h4>Capture</h4>
                 <div class="controls">
                     <button id="screenshotBtn">Screenshot Visible Page</button>
@@ -158,6 +161,7 @@ body    {style:example;}
                 </div>
                 <div id="mediaList"></div>
                 <div class="hint">Tip: on desktop you can also right-click a video and choose "Download this video".</div>
+                <!-- __PS_STORE_STRIP_END__ -->
                 <h4>Saved snippets</h4>
                 <div class="controls">
                     <button id="refreshBtn">Refresh list</button>

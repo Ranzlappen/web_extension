@@ -75,3 +75,26 @@ jobs:
             if(!k.background||k.background.persistent!==false) fail('MV2 background must be a non-persistent event page');
             console.log('Kiwi MV2 manifest OK (v'+k.version+')');
           "
+
+      - name: Validate derived Chrome Web Store package
+        run: |
+          set -e
+          # Builds the stripped store package (Capture/Media removed) and runs
+          # its internal checks: stripped JS still parses, no stripped symbol
+          # or permission remains referenced.
+          node tools/build-store-package.mjs /tmp/store-pkg
+          node -e "
+            const fs=require('fs');
+            const mv3=JSON.parse(fs.readFileSync('domain-css-injector-v2/manifest.json','utf8'));
+            const s=JSON.parse(fs.readFileSync('/tmp/store-pkg/manifest.json','utf8'));
+            const fail=(m)=>{console.error('::error::'+m);process.exit(1);};
+            if(s.manifest_version!==3) fail('Store manifest must be manifest_version 3');
+            if(s.version!==mv3.version) fail('Store/MV3 version drift');
+            if(s.name!==mv3.name) fail('Store/MV3 name drift');
+            for(const p of ['downloads','contextMenus'])
+              if((s.permissions||[]).includes(p)) fail(p+' must be stripped from the store build');
+            for(const k of ['background','sidebar_action','browser_specific_settings'])
+              if(k in s) fail(k+' must be stripped from the store manifest');
+            if(fs.existsSync('/tmp/store-pkg/background.js')) fail('background.js must not ship in the store build');
+            console.log('Store package OK (v'+s.version+')');
+          "

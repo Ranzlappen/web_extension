@@ -173,6 +173,26 @@ jobs:
             console.log('Kiwi zip OK: MV2, version '+m.version);
           "
 
+      # The Chrome Web Store upload is a third, derived zip: same MV3 source
+      # with the Capture/Media features and their permissions stripped (see
+      # tools/build-store-package.mjs). Upload THIS one to the dashboard.
+      - name: Build Chrome Web Store zip
+        id: build_store
+        run: |
+          set -e
+          bash tools/build-store-zip.sh dist
+          OUT="dist/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}-store.zip"
+          test -f "$OUT" || { echo "::error::Store zip not produced at $OUT"; ls -la dist; exit 1; }
+          echo "artifact=$OUT" >> "$GITHUB_OUTPUT"
+          node -e "
+            const cp=require('child_process');
+            const m=JSON.parse(cp.execSync('unzip -p \"$OUT\" manifest.json').toString());
+            if(m.manifest_version!==3){console.error('::error::Store manifest is not v3');process.exit(1);}
+            if(m.version!=='${{ steps.meta.outputs.version }}'){console.error('::error::Store version drift');process.exit(1);}
+            if((m.permissions||[]).includes('downloads')){console.error('::error::downloads not stripped');process.exit(1);}
+            console.log('Store zip OK: MV3, version '+m.version);
+          "
+
       # NOTE: Downloading these artifacts from the Actions UI re-zips them
       # (GitHub wraps artifacts), producing a zip-in-zip with no manifest at the
       # root. For store/AMO uploads or sideloading on Kiwi, use the assets
@@ -184,6 +204,7 @@ jobs:
           path: |
             ${{ steps.build.outputs.artifact }}
             ${{ steps.build_kiwi.outputs.artifact }}
+            ${{ steps.build_store.outputs.artifact }}
           if-no-files-found: error
 
       - name: Create / update GitHub Release
@@ -194,4 +215,5 @@ jobs:
           files: |
             ${{ steps.build.outputs.artifact }}
             ${{ steps.build_kiwi.outputs.artifact }}
+            ${{ steps.build_store.outputs.artifact }}
           generate_release_notes: true
