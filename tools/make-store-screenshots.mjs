@@ -110,6 +110,7 @@ try {
   await popup.reload();
   await popup.waitForTimeout(1200);
 
+  const raws = {};
   for (const shot of SHOTS) {
     await popup.evaluate(({ open, css }) => {
       document.getElementById('domainInfo').textContent = 'Detected site: example.com';
@@ -143,6 +144,7 @@ try {
       window.scrollTo(0, 0);
     }, shot.open);
     const raw = await popup.screenshot({ clip: { x: 0, y: 0, width: 420, height: 760 } });
+    raws[shot.file] = raw;
 
     // Compose the popup capture onto the 1280x800 store canvas.
     const canvas = await context.newPage();
@@ -183,6 +185,64 @@ try {
     writeFileSync(resolve(OUT, shot.file), png);
     await canvas.close();
     console.log(`wrote store/screenshots/${shot.file}`);
+  }
+  // Optional store promo images: small tile (440x280) and marquee (1400x560).
+  const iconB64 = readFileSync(resolve(EXT, 'icons', 'icon128.png')).toString('base64');
+  const promoCss = `
+    * { margin: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+      background: radial-gradient(900px 600px at 80% 15%, #1d2440 0%, #0f121c 55%, #0a0d14 100%);
+      color: #e6e8ef; display: flex; align-items: center; }
+    img.icon { border-radius: 14px; border: 1px solid #2f3854;
+      box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 22px rgba(74,163,255,.18); }
+    .badge { display: inline-block; padding: 6px 14px; border: 1px solid #2a2f44;
+      border-radius: 999px; color: #7fb7ff; background: #11151f; }`;
+  const promos = [
+    {
+      file: 'promo-small-440x280.png', width: 440, height: 280,
+      html: `<style>${promoCss}
+        body { justify-content: center; text-align: center; }
+        .wrap { padding: 0 24px; }
+        img.icon { width: 72px; height: 72px; margin-bottom: 14px; }
+        h1 { font-size: 34px; font-weight: 800; margin-bottom: 8px; }
+        p { font-size: 16px; color: #aab3c5; }
+      </style><div class="wrap">
+        <img class="icon" src="data:image/png;base64,${iconB64}">
+        <h1>Pageside</h1>
+        <p>Your own CSS, on every site you visit</p>
+      </div>`
+    },
+    {
+      file: 'promo-marquee-1400x560.png', width: 1400, height: 560,
+      html: `<style>${promoCss}
+        .text { flex: 1 1 auto; padding: 0 40px 0 72px; }
+        .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+        img.icon { width: 56px; height: 56px; }
+        .brand span { font-size: 26px; font-weight: 700; }
+        h1 { font-size: 48px; line-height: 1.12; font-weight: 800; margin-bottom: 18px; max-width: 640px; }
+        p { font-size: 21px; line-height: 1.45; color: #aab3c5; max-width: 560px; margin-bottom: 26px; }
+        .shotwrap { flex: 0 0 auto; padding-right: 72px; align-self: flex-start; margin-top: 48px; }
+        .shot { width: 330px; display: block; border-radius: 14px; border: 1px solid #2a2f44;
+          box-shadow: 0 30px 80px rgba(0,0,0,.65); }
+      </style>
+      <div class="text">
+        <div class="brand"><img class="icon" src="data:image/png;base64,${iconB64}"><span>Pageside</span></div>
+        <h1>Make any site look the way you want</h1>
+        <p>Per-site custom CSS with live preview, an element picker &amp; hider, read-aloud, private site notes, and a tab organizer.</p>
+        <div class="badge">100% local — no account, no server, no tracking</div>
+      </div>
+      <div class="shotwrap"><img class="shot" src="data:image/png;base64,${raws['01-style-editor.png'].toString('base64')}"></div>`
+    }
+  ];
+  for (const promo of promos) {
+    const pg = await context.newPage();
+    await pg.setViewportSize({ width: promo.width, height: promo.height });
+    await pg.setContent(`<!doctype html><html><head></head><body style="width:${promo.width}px;height:${promo.height}px">${promo.html}</body></html>`);
+    await pg.waitForTimeout(250);
+    const png = await pg.screenshot({ clip: { x: 0, y: 0, width: promo.width, height: promo.height }, scale: 'css' });
+    writeFileSync(resolve(OUT, promo.file), png);
+    await pg.close();
+    console.log(`wrote store/screenshots/${promo.file}`);
   }
 } finally {
   await context.close();
