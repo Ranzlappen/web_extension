@@ -262,7 +262,7 @@ This is the fastest path when you can see the video you want. It uses the `conte
 
 1. Open the page that has a `<video>` element.
 2. Open the editor and click **Download Video Media**.
-3. The popup scans every frame for `video.currentSrc`, `<source>` tags, media-typed `<a href>` links, network resource entries, and (on YouTube) `ytInitialPlayerResponse`.
+3. The popup scans every frame for `video.currentSrc`, `<source>` tags, media-typed `<a href>` links, and network resource entries.
 4. Found sources appear as an in-popup tappable list, ranked by likelihood of being a real downloadable file. Tap one to download it. (Blob streams are shown disabled — they cannot be fetched directly.)
 
 Use B when the video tag is hidden, lazy-loaded, or you need an alternate quality / source URL.
@@ -328,7 +328,11 @@ opera/
 │   └── workflows/
 │       ├── ci.yml               ← extension lint / validation (incl. derived MV2 manifest)
 │       └── release.yml          ← tagged production builds (MV3 + Kiwi MV2 zips + GitHub Release)
+├── store/                       ← Chrome Web Store listing copy, publishing guide, screenshots
+│   ├── chrome-web-store.md      ← listing text, permission justifications, submission walkthrough
+│   └── screenshots/             ← 1280×800 store screenshots (regenerate: tools/make-store-screenshots.mjs)
 ├── pwa-inventory.md             ← chrome.storage and manifest inventory (per repo standards)
+├── PRIVACY.md                   ← privacy policy (linked from the Web Store listing)
 ├── CLAUDE.md                    ← architecture source of truth
 ├── LICENSE                      ← MIT
 └── README.md                    ← this file
@@ -341,6 +345,15 @@ opera/
 * `domain-css-injector-v2/content.js` — what runs on the page itself
 
 **For deeper changes** see [`CLAUDE.md`](./CLAUDE.md).
+
+---
+
+## Privacy
+
+Pageside collects nothing — no server, no telemetry, all data local. Full
+policy: [`PRIVACY.md`](./PRIVACY.md). Chrome Web Store listing content and
+the publishing walkthrough live in
+[`store/chrome-web-store.md`](./store/chrome-web-store.md).
 
 ---
 

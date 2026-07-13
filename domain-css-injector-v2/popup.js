@@ -397,16 +397,6 @@ async function collectMediaSources() {
                 }
             });
 
-            if (window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.streamingData) {
-                const { formats = [], adaptiveFormats = [] } = window.ytInitialPlayerResponse.streamingData;
-                [...formats, ...adaptiveFormats].forEach((fmt) => {
-                    addCandidate(fmt.url, 'YouTube stream', {
-                        qualityLabel: fmt.qualityLabel || '',
-                        mimeType: fmt.mimeType || ''
-                    });
-                });
-            }
-
             return candidates;
         }, { allFrames: true });
     } catch (err) {
