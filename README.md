@@ -305,7 +305,7 @@ The **Password** section generates strong secrets using the browser's cryptograp
 
 The **Tabs** section operates on every open tab across all your windows. It stores nothing — each action runs against the live tabs.
 
-* **Sort tabs** reorders the tabs in each window by the chosen key — **domain**, **title**, or **URL**. Pinned tabs stay put; only the movable tabs are reordered.
+* **Sort tabs** reorders the tabs in each window by the chosen key — **domain**, **title**, or **URL**. Pinned tabs stay put; only the movable tabs are reordered. After sorting, the real tab order is re-checked: if the browser blocks tab moves (some Android forks do), Pageside says so next to the list and sorts the **visible list** instead, so you can still jump to tabs in order.
 * **Group by domain** collects same-domain tabs into native browser tab groups (one labelled group per domain, per window). This uses `chrome.tabGroups` and is **Chrome / Edge desktop only** — the button hides itself on Firefox, Opera, and the Kiwi/Android build, where the API doesn't exist.
 * **Close duplicates** closes any tab whose URL exactly matches an earlier open tab, keeping the first. Pinned tabs are never closed.
 * The **filter box** narrows the live tab list; click a row to jump to that tab (and focus its window), or tap **✕** to close it.

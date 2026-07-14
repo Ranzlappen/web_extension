@@ -9,6 +9,10 @@
 // feature-detected at runtime and the Group button is hidden where unsupported.
 (function () {
   let listTimer = null;
+  let tabsNoteTimer = null;
+  // When the browser can't (or won't) reorder real tabs, fall back to sorting
+  // the rendered list by this key so the user still gets a sorted view.
+  let viewSortKey = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -16,32 +20,64 @@
     if (typeof showStatus === 'function') showStatus(msg, timeout);
   }
 
-  // chrome.tabs is callback-based on every target; wrap the calls we need in
-  // never-throwing promises so a single quirky fork can't wedge the popup.
+  // Outcome messages must be visible next to the Tabs UI: the shared #status
+  // element sits at the top of the popup and is scrolled out of view on
+  // mobile when the Tabs section is open — which made failures look silent.
+  function tabsNote(msg, timeout) {
+    note(msg, timeout);
+    const host = $('tabsList');
+    if (!host || !host.parentNode) return;
+    let el = $('tabsInlineNote');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'tabsInlineNote';
+      el.className = 'hint';
+      host.parentNode.insertBefore(el, host);
+    }
+    el.textContent = msg;
+    clearTimeout(tabsNoteTimer);
+    tabsNoteTimer = setTimeout(() => { el.textContent = ''; }, timeout || 4000);
+  }
+
+  // Defensive wrapper for callback-style chrome.* calls. Some Chromium forks
+  // (Kiwi) throw synchronously, set runtime.lastError, or accept the callback
+  // and then NEVER invoke it — an un-guarded await on such a call wedges the
+  // popup forever with no error (the "sort silently does nothing" bug).
+  // Resolves { ok, result?, err?, timedOut? } and never rejects or hangs.
+  function cbCall(invoke, timeoutMs) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (r) => { if (!done) { done = true; resolve(r); } };
+      const timer = setTimeout(() => finish({ ok: false, timedOut: true }), timeoutMs || 1500);
+      try {
+        invoke((result) => {
+          clearTimeout(timer);
+          const err = chrome.runtime && chrome.runtime.lastError;
+          finish(err ? { ok: false, err: err.message || String(err) } : { ok: true, result });
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        finish({ ok: false, err: (e && e.message) || String(e) });
+      }
+    });
+  }
 
   // Enumerate every tab. chrome.windows.getAll({populate:true}) is the canonical
   // "list all tabs" API — it returns each window with its full tabs array,
   // including inactive / discarded ("sleeping") tabs — and is more reliable than
   // a bare chrome.tabs.query({}), which on some Chromium forks (Kiwi/Android)
   // returns only the active tab. We prefer getAll and fall back to query().
-  function queryViaWindows() {
-    return new Promise((resolve) => {
-      if (!(chrome.windows && typeof chrome.windows.getAll === 'function')) return resolve(null);
-      try {
-        chrome.windows.getAll({ populate: true }, (wins) => {
-          if (chrome.runtime.lastError || !wins) return resolve(null);
-          const tabs = [];
-          for (const w of wins) if (Array.isArray(w.tabs)) tabs.push(...w.tabs);
-          resolve(tabs);
-        });
-      } catch (_) { resolve(null); }
-    });
+  async function queryViaWindows() {
+    if (!(chrome.windows && typeof chrome.windows.getAll === 'function')) return null;
+    const r = await cbCall((cb) => chrome.windows.getAll({ populate: true }, cb));
+    if (!r.ok || !Array.isArray(r.result)) return null;
+    const tabs = [];
+    for (const w of r.result) if (Array.isArray(w.tabs)) tabs.push(...w.tabs);
+    return tabs;
   }
-  function queryViaTabs() {
-    return new Promise((resolve) => {
-      try { chrome.tabs.query({}, (tabs) => resolve(tabs || [])); }
-      catch (_) { resolve([]); }
-    });
+  async function queryViaTabs() {
+    const r = await cbCall((cb) => chrome.tabs.query({}, cb));
+    return (r.ok && Array.isArray(r.result)) ? r.result : [];
   }
   async function queryAll() {
     const viaWin = await queryViaWindows();
@@ -52,17 +88,14 @@
     return out;
   }
   function moveTab(id, index) {
-    return new Promise((resolve) => {
-      try { chrome.tabs.move(id, { index }, () => { void chrome.runtime.lastError; resolve(); }); }
-      catch (_) { resolve(); }
-    });
+    if (!(chrome.tabs && typeof chrome.tabs.move === 'function')) {
+      return Promise.resolve({ ok: false, err: 'tabs.move unavailable' });
+    }
+    return cbCall((cb) => chrome.tabs.move(id, { index }, cb));
   }
   function removeTabs(ids) {
-    return new Promise((resolve) => {
-      if (!ids.length) return resolve();
-      try { chrome.tabs.remove(ids, () => { void chrome.runtime.lastError; resolve(); }); }
-      catch (_) { resolve(); }
-    });
+    if (!ids.length) return Promise.resolve({ ok: true });
+    return cbCall((cb) => chrome.tabs.remove(ids, cb));
   }
 
   // Base domain of a tab, reusing popup.js's resolveBaseHost. Tabs without a
@@ -92,26 +125,86 @@
     return map;
   }
 
-  async function sortTabs() {
-    const key = ($('tabsSort') && $('tabsSort').value) || 'domain';
-    const tabs = await queryAll();
-    let moved = 0;
+  // Compare movable tabs (in index order) against the wanted order. Returns
+  // how many adjacent pairs are out of order — 0 means correctly sorted.
+  function countMisordered(tabs, key) {
+    let bad = 0;
     for (const winTabs of byWindow(tabs).values()) {
-      // Pinned tabs hold the leading indices and must not move; only reorder the
-      // movable tabs among the index slots they already occupy.
-      const movable = winTabs.filter((t) => !t.pinned);
-      const slots = movable.map((t) => t.index).sort((a, b) => a - b);
-      const ordered = movable.slice().sort((a, b) => {
-        const ka = sortKeyValue(a, key), kb = sortKeyValue(b, key);
-        return ka < kb ? -1 : ka > kb ? 1 : 0;
-      });
-      for (let i = 0; i < ordered.length; i++) {
-        await moveTab(ordered[i].id, slots[i]);
-        moved++;
+      const movable = winTabs.filter((t) => !t.pinned).sort((a, b) => a.index - b.index);
+      for (let i = 1; i < movable.length; i++) {
+        if (sortKeyValue(movable[i - 1], key) > sortKeyValue(movable[i], key)) bad++;
       }
     }
-    note(`Sorted ${moved} tab${moved === 1 ? '' : 's'} by ${key}.`);
-    scheduleRender();
+    return bad;
+  }
+
+  let sortRunning = false;
+  async function sortTabs() {
+    if (sortRunning) return; // ignore double-taps while a sort is in flight
+    sortRunning = true;
+    try {
+      const key = ($('tabsSort') && $('tabsSort').value) || 'domain';
+      if (!(chrome.tabs && typeof chrome.tabs.move === 'function')) {
+        viewSortKey = key;
+        tabsNote('This browser cannot reorder tabs — sorted the list below instead.', 4500);
+        scheduleRender();
+        return;
+      }
+      const tabs = await queryAll();
+      if (!tabs.length) {
+        tabsNote('No tabs found — the browser did not answer the tab query.', 3500);
+        return;
+      }
+      let moved = 0, failed = 0, hung = false;
+      for (const winTabs of byWindow(tabs).values()) {
+        // Pinned tabs hold the leading indices and must not move; only reorder
+        // the movable tabs among the index slots they already occupy.
+        const movable = winTabs.filter((t) => !t.pinned);
+        const slots = movable.map((t) => t.index).sort((a, b) => a - b);
+        const ordered = movable.slice().sort((a, b) => {
+          const ka = sortKeyValue(a, key), kb = sortKeyValue(b, key);
+          return ka < kb ? -1 : ka > kb ? 1 : 0;
+        });
+        // Track indices locally as moves shift them, so tabs already in place
+        // are skipped instead of burning API calls on no-op moves.
+        const liveIndex = new Map(movable.map((t) => [t.id, t.index]));
+        for (let i = 0; i < ordered.length; i++) {
+          const id = ordered[i].id;
+          const target = slots[i];
+          const current = liveIndex.get(id);
+          if (current === target) continue;
+          const r = await moveTab(id, target);
+          if (r.timedOut) { hung = true; break; } // fork never called back — bail, don't wedge
+          if (!r.ok) { failed++; continue; }
+          moved++;
+          for (const [tid, idx] of liveIndex) {
+            if (tid === id) continue;
+            if (current > target && idx >= target && idx < current) liveIndex.set(tid, idx + 1);
+            else if (current < target && idx > current && idx <= target) liveIndex.set(tid, idx - 1);
+          }
+          liveIndex.set(id, target);
+        }
+        if (hung) break;
+      }
+      // Trust but verify: some forks accept the move and silently ignore it.
+      // Re-query and check the real order before claiming success.
+      const misordered = countMisordered(await queryAll(), key);
+      if (hung || (misordered > 0 && moved === 0)) {
+        viewSortKey = key;
+        tabsNote('This browser refused to move tabs — sorted the list below instead.', 4500);
+      } else if (misordered > 0) {
+        viewSortKey = key;
+        tabsNote(`Sorted, but the browser refused to move ${failed || misordered} tab${(failed || misordered) === 1 ? '' : 's'} — list below shows the intended order.`, 4500);
+      } else {
+        viewSortKey = null;
+        tabsNote(moved
+          ? `Sorted ${moved} tab${moved === 1 ? '' : 's'} by ${key}.`
+          : `Tabs were already sorted by ${key}.`);
+      }
+      scheduleRender();
+    } finally {
+      sortRunning = false;
+    }
   }
 
   function groupingSupported() {
@@ -133,19 +226,13 @@
       }
       for (const [domain, ids] of buckets) {
         if (ids.length < 2) continue; // a lone tab isn't worth a group
-        await new Promise((resolve) => {
-          try {
-            chrome.tabs.group({ tabIds: ids }, (groupId) => {
-              if (chrome.runtime.lastError || groupId == null) return resolve();
-              groups++;
-              try { chrome.tabGroups.update(groupId, { title: domain }, () => { void chrome.runtime.lastError; resolve(); }); }
-              catch (_) { resolve(); }
-            });
-          } catch (_) { resolve(); }
-        });
+        const g = await cbCall((cb) => chrome.tabs.group({ tabIds: ids }, cb));
+        if (!g.ok || g.result == null) continue;
+        groups++;
+        await cbCall((cb) => chrome.tabGroups.update(g.result, { title: domain }, cb));
       }
     }
-    note(`Created ${groups} group${groups === 1 ? '' : 's'} by domain.`);
+    tabsNote(`Created ${groups} group${groups === 1 ? '' : 's'} by domain.`);
     scheduleRender();
   }
 
@@ -157,8 +244,12 @@
       if (t.pinned || !t.url) continue;
       if (seen.has(t.url)) dupes.push(t.id); else seen.add(t.url);
     }
-    await removeTabs(dupes);
-    note(`Closed ${dupes.length} duplicate tab${dupes.length === 1 ? '' : 's'}.`);
+    const r = await removeTabs(dupes);
+    if (dupes.length && !r.ok) {
+      tabsNote('The browser refused to close the duplicate tabs.', 3500);
+    } else {
+      tabsNote(`Closed ${dupes.length} duplicate tab${dupes.length === 1 ? '' : 's'}.`);
+    }
     scheduleRender();
   }
 
@@ -180,6 +271,14 @@
         if (!filter) return true;
         return (t.title || '').toLowerCase().includes(filter) || (t.url || '').toLowerCase().includes(filter);
       });
+      // Fallback view-sort: when the browser can't reorder real tabs, at least
+      // present the list in the order the user asked for.
+      if (viewSortKey) {
+        matches.sort((a, b) => {
+          const ka = sortKeyValue(a, viewSortKey), kb = sortKeyValue(b, viewSortKey);
+          return ka < kb ? -1 : ka > kb ? 1 : 0;
+        });
+      }
       // Always show a count so it's obvious every tab was found.
       const count = document.createElement('div');
       count.className = 'small';
