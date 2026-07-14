@@ -354,6 +354,16 @@ opera/
 
 ---
 
+## Support
+
+Pageside is free and every feature is included. If it saves you time, you can
+support development at [ko-fi.com/F1F1140LWT](https://ko-fi.com/F1F1140LWT) —
+entirely optional. The popup's "☕ Support this project" footer link goes to
+the same place (a plain text link by design: the extension never loads remote
+resources, so no hosted donate-button image).
+
+---
+
 ## Privacy
 
 Pageside collects nothing — no server, no telemetry, all data local. Full

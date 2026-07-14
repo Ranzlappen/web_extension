@@ -685,6 +685,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             showStatus('Preset added to the editor — Preview or Save to apply.', 2500);
         });
     });
+    // Support link: open through tabs.create — a target=_blank anchor is
+    // unreliable from some popup surfaces; the anchor stays as the fallback
+    // (and keeps copy-link / middle-click working).
+    const kofiLink = document.getElementById('kofiLink');
+    if (kofiLink) {
+        kofiLink.addEventListener('click', (e) => {
+            if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+                e.preventDefault();
+                chrome.tabs.create({ url: kofiLink.href });
+            }
+        });
+    }
     const importBtn = document.getElementById('importBtn');
     const importFile = document.getElementById('importFile');
     if (importBtn && importFile) {

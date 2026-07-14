@@ -38,6 +38,9 @@ your device unless you move it yourself.
 
 * No data is sent to the developer or to any third party.
 * No analytics, tracking, fingerprinting, or advertising identifiers.
+* The popup contains a "Support this project" text link to the developer's
+  Ko-fi page. It is a plain link: nothing is loaded from Ko-fi unless you
+  click it, and clicking simply opens the page in a new browser tab.
 * No reading of passwords, form fields, or keystrokes on web pages.
 * No remote code — every line of code ships inside the extension package.
 * No sale or transfer of user data to anyone, for any purpose.

@@ -91,6 +91,11 @@ PRIVACY, PLAINLY
 Pageside has no server and sends nothing anywhere. Your styles, notes, and
 settings live only in your browser's local extension storage — uninstall
 the extension and they're gone. No analytics, no accounts, no remote code.
+
+SUPPORT
+Pageside is free, with every feature included. If it saves you time and you
+feel like saying thanks, you can support development at
+https://ko-fi.com/F1F1140LWT — entirely optional, nothing is ever locked.
 ```
 
 **Graphic assets:**

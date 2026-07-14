@@ -62,6 +62,11 @@
         .tab-row{display:flex;gap:6px;align-items:stretch;margin:4px 0}
         .tab-open{flex:1 1 auto;width:auto;margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .tab-close{flex:0 0 44px;width:44px;margin:0;}
+        /* Support footer — a plain text link (deliberately NOT the hosted
+           Ko-fi button image: the popup must never fetch remote resources). */
+        .footer{text-align:center;margin-top:14px;padding:6px 0}
+        .footer a{color:#7fb7ff;font-size:0.85em;text-decoration:none;padding:8px 10px}
+        .footer a:hover{text-decoration:underline}
     </style>
 </head>
 
@@ -192,6 +197,10 @@ body    {style:example;}
                 <div id="tabsList"></div>
             </div>
         </details>
+
+        <div class="footer">
+            <a id="kofiLink" href="https://ko-fi.com/F1F1140LWT" target="_blank" rel="noopener">☕ Support this project</a>
+        </div>
     <script src="popup.js"></script>
     <script src="popup-editor.js"></script>
     <script src="popup-notepad.js"></script>
