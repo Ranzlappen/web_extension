@@ -91,6 +91,11 @@ PRIVACY, PLAINLY
 Pageside has no server and sends nothing anywhere. Your styles, notes, and
 settings live only in your browser's local extension storage — uninstall
 the extension and they're gone. No analytics, no accounts, no remote code.
+
+SUPPORT
+Pageside is free, with every feature included. If it saves you time and you
+feel like saying thanks, you can support development at
+https://ko-fi.com/F1F1140LWT — entirely optional, nothing is ever locked.
 ```
 
 **Graphic assets:**
@@ -99,8 +104,8 @@ the extension and they're gone. No analytics, no accounts, no remote code.
 | --- | --- | --- |
 | Store icon | 128×128 PNG | `domain-css-injector-v2/icons/icon128.png` |
 | Screenshots (1–5) | 1280×800 (or 640×400) PNG/JPEG | `store/screenshots/*.png` (regenerate with `tools/make-store-screenshots.mjs`) |
-| Small promo tile | 440×280 (optional) | — |
-| Marquee promo | 1400×560 (optional) | — |
+| Small promo tile | 440×280 (optional) | `store/screenshots/promo-small-440x280.png` |
+| Marquee promo | 1400×560 (optional) | `store/screenshots/promo-marquee-1400x560.png` |
 
 ## 4. Privacy practices tab (required — most rejections happen here)
 

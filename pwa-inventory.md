@@ -4,6 +4,8 @@ This repo is **not** a Progressive Web App — it is a Manifest V3 browser exten
 
 This inventory captures every key, path, and identifier whose value is part of the extension's external contract. **Every value below is sacred** and must round-trip identically through any refactor.
 
+> **Derived distribution note:** the Chrome Web Store package (`pageside-<version>-store.zip`, built by `tools/build-store-package.mjs`) ships a *subset* of this inventory — the Capture/Media surface, `background.js`, and the `downloads` / `contextMenus` permissions are stripped, and the Opera/Firefox-only manifest keys are removed. Every storage key, the injected style-element ids, and the message-channel types are identical across all builds, so data written by one build is fully readable by another.
+
 ---
 
 ## 1. Storage keys
