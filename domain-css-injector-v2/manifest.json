@@ -3,6 +3,7 @@
   "name": "Pageside",
   "version": "3.0.1",
   "description": "Per-site style helper with element picker, text reader, and media saver.",
+  "homepage_url": "https://pageside.ranzlappen.com",
   "permissions": [
     "storage",
     "activeTab",

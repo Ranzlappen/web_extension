@@ -1,0 +1,57 @@
+# Deploys the static marketing/support site in site/ to GitHub Pages
+# (pageside.ranzlappen.com — the Chrome Web Store listing's homepage, support,
+# and privacy-policy URLs).
+#
+# Deliberately isolated from the extension pipelines: this workflow fires ONLY
+# on site/** (plus itself), and the extension workflows (ci.yml paths filter,
+# release.yml tag/dispatch triggers) never fire on site/**. The site is pure
+# static files — no build step; the site/ directory IS the artifact.
+#
+# One-time setup (repo settings, not automatable from here):
+#   1. Settings -> Pages -> Source: "GitHub Actions"
+#   2. Settings -> Pages -> Custom domain: pageside.ranzlappen.com
+#   3. DNS: CNAME record  pageside  ->  ranzlappen.github.io
+#
+# Required secrets: none.
+
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

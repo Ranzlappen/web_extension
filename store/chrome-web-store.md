@@ -44,6 +44,10 @@ Developer Tools fits the CSS editor best).
 
 **Language:** English
 
+**Homepage URL:** `https://pageside.ranzlappen.com`
+**Support URL:** `https://pageside.ranzlappen.com/support/`
+(both served from `site/` via the `pages.yml` GitHub Pages workflow)
+
 **Detailed description** (deliberately frames every feature as one purpose —
 a per-site companion panel — so the parts read as facets of the same tool,
 not a grab-bag):
@@ -140,10 +144,9 @@ collect?" list (no categories apply — data never leaves the device), then
 certify the three disclosures (no sale, no unrelated transfer, no
 creditworthiness use).
 
-**Privacy policy URL:**
-`https://github.com/Ranzlappen/web_extension/blob/main/PRIVACY.md`
-(must be publicly reachable — if the repo is private, publish PRIVACY.md via
-GitHub Pages or a public Gist and use that URL instead).
+**Privacy policy URL:** `https://pageside.ranzlappen.com/privacy/`
+(the GitHub Pages mirror of `PRIVACY.md` — always publicly reachable,
+independent of repo visibility; keep the two in sync when the policy changes).
 
 ## 5. Distribution tab
 

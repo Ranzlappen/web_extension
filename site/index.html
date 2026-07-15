@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pageside — your own CSS on every site you visit</title>
+  <meta name="description" content="Pageside is a free browser extension: per-site custom CSS with live preview, an element picker & hider, read-aloud, private site notes, and a tab organizer. 100% local — no account, no server, no tracking.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/icon.png" alt="Pageside icon">Pageside</a>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/support/">Support</a>
+        <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero wrap">
+      <h1>Make any site look the way you want</h1>
+      <p class="lead">Write CSS for the site you're on — Pageside remembers it and re-applies it on
+        every visit. Plus an element picker &amp; hider, read-aloud, private per-site notes, and a
+        tab organizer. All in one small panel.</p>
+      <div class="cta">
+        <!-- TODO: replace href with the Chrome Web Store listing URL once the extension is approved -->
+        <a class="btn primary" href="https://github.com/Ranzlappen/web_extension/releases/latest">Get Pageside</a>
+        <a class="btn ghost" href="https://github.com/Ranzlappen/web_extension#getting-started">Install guide</a>
+      </div>
+      <div class="badge">100% local — no account, no server, no tracking</div>
+      <div class="shot">
+        <img src="/assets/screenshot-style.png" alt="The Pageside popup showing the per-site CSS editor" loading="lazy">
+      </div>
+    </div>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>Everything, organized around the site you're on</h2>
+        <div class="grid">
+          <div class="card">
+            <span class="emoji">🎨</span>
+            <h3>Per-site CSS that sticks</h3>
+            <p>Save a stylesheet per site and it re-applies automatically on every future visit.
+               Live preview before saving, a per-site on/off switch, and quick presets: dark mode,
+               hide sticky &amp; cookie bars, readable text, bigger text.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">🎯</span>
+            <h3>Point, click, gone</h3>
+            <p>The element picker copies any element's exact CSS selector to your clipboard.
+               Hide Element removes a banner, overlay, or nag permanently with one tap — undo any
+               time by deleting the saved rule.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">🔊</span>
+            <h3>Read pages aloud</h3>
+            <p>Text-to-speech for the selected text or the whole article, with an adjustable speed
+               slider. Hands-free reading for long pages.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">📝</span>
+            <h3>Private site notes</h3>
+            <p>A notepad per site that auto-saves as you type, stays on your device, and reappears
+               whenever you're back. Never included in exports.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">🔑</span>
+            <h3>Password generator</h3>
+            <p>Strong passwords and passphrases from the browser's cryptographic RNG, with a live
+               strength meter. Nothing is ever stored.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">🗂️</span>
+            <h3>Tab organizer</h3>
+            <p>Sort your open tabs by domain, title, or URL. Group same-site tabs, close
+               duplicates, and jump to any tab across all windows.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy-strip">
+      <div class="wrap">
+        <h2>Private by construction</h2>
+        <div class="grid">
+          <div class="card">
+            <span class="emoji">🔒</span>
+            <h3>Nothing leaves your device</h3>
+            <p>No server, no telemetry, no accounts. Styles, notes, and settings live only in your
+               browser's local extension storage — uninstall and they're gone.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">📦</span>
+            <h3>No remote code</h3>
+            <p>Every line of code ships inside the extension package. There are no network calls,
+               no analytics SDKs, and no remote configuration.</p>
+          </div>
+          <div class="card">
+            <span class="emoji">📖</span>
+            <h3>Open source</h3>
+            <p>The full source is on <a href="https://github.com/Ranzlappen/web_extension" style="color:var(--accent-soft)">GitHub</a> under the MIT license.
+               Read the <a href="/privacy/" style="color:var(--accent-soft)">privacy policy</a> — it's short, because there's nothing to disclose.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="mobile">
+      <div class="wrap">
+        <h2>On your phone too</h2>
+        <p style="color:var(--muted); max-width:720px">Pageside runs on Android Chromium browsers with extension
+           support (Kiwi, Mises, Lemur, Yandex) and Firefox Nightly. Grab the dedicated
+           <strong>-kiwi.zip</strong> build from the
+           <a href="https://github.com/Ranzlappen/web_extension/releases/latest" style="color:var(--accent-soft)">latest release</a>
+           and see the <a href="https://github.com/Ranzlappen/web_extension#mobile-installation" style="color:var(--accent-soft)">step-by-step mobile guide</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Ranzlappen · MIT license</span>
+      <span class="spacer"></span>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+      <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      <a href="https://ko-fi.com/F1F1140LWT">☕ Ko-fi</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Pageside</title>
+  <meta name="description" content="Pageside privacy policy: the extension collects nothing — no server, no analytics, no telemetry. All data stays on your device.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/icon.png" alt="Pageside icon">Pageside</a>
+      <nav>
+        <a href="/#features">Features</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/support/">Support</a>
+        <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap prose">
+    <h1>Privacy Policy</h1>
+    <p class="sub">Last updated: 2026-07-15 · This page mirrors
+      <a href="https://github.com/Ranzlappen/web_extension/blob/main/PRIVACY.md">PRIVACY.md</a> in the source repository.</p>
+
+    <p>Pageside is a browser extension that lets you save a custom CSS snippet per website, plus a
+       small set of page tools (element picker, text-to-speech reader, per-site notepad, password
+       generator, and tab organizer; the self-hosted builds distributed on GitHub additionally
+       include a page screenshot and a page-media saver).</p>
+
+    <h2>The short version</h2>
+    <p><strong>Pageside collects nothing.</strong> It has no server, no analytics, no telemetry, no
+       accounts, and it never transmits any data off your device. Everything you create in the
+       extension is stored locally in your browser and nowhere else.</p>
+
+    <h2>What the extension stores, and where</h2>
+    <p>All data lives exclusively in your browser's local extension storage
+       (<code>chrome.storage.local</code>) on your own device:</p>
+    <table>
+      <tr><th>Data</th><th>Why</th><th>Where it goes</th></tr>
+      <tr><td>CSS snippets you write, keyed by site domain</td><td>So your styles re-apply on your next visit</td><td>Local extension storage only</td></tr>
+      <tr><td>Per-site notes you type in the Notes section</td><td>So your note reloads on that site</td><td>Local extension storage only</td></tr>
+      <tr><td>Unsaved editor drafts</td><td>So closing the popup mid-edit loses nothing</td><td>Local extension storage only</td></tr>
+      <tr><td>Per-site on/off toggle state</td><td>So a disabled site stays disabled</td><td>Local extension storage only</td></tr>
+      <tr><td>The domain of the page you last viewed</td><td>Used only as a fallback for site detection in the popup</td><td>Local extension storage only</td></tr>
+    </table>
+    <p>Generated passwords are <strong>never stored anywhere</strong> — they exist only in the popup
+       until you close it. Uninstalling the extension deletes all of this data. The Export JSON
+       feature writes a backup file to a location you choose; that file never leaves your device
+       unless you move it yourself.</p>
+
+    <h2>What the extension does NOT do</h2>
+    <ul>
+      <li>No data is sent to the developer or to any third party.</li>
+      <li>No analytics, tracking, fingerprinting, or advertising identifiers.</li>
+      <li>The popup contains a "Support this project" text link to the developer's Ko-fi page.
+          It is a plain link: nothing is loaded from Ko-fi unless you click it, and clicking simply
+          opens the page in a new browser tab.</li>
+      <li>No reading of passwords, form fields, or keystrokes on web pages.</li>
+      <li>No remote code — every line of code ships inside the extension package.</li>
+      <li>No sale or transfer of user data to anyone, for any purpose.</li>
+    </ul>
+
+    <h2>Permissions explained</h2>
+    <table>
+      <tr><th>Permission</th><th>What it is used for</th></tr>
+      <tr><td>Access to websites (<code>&lt;all_urls&gt;</code>)</td><td>Applying <strong>your own</strong> saved CSS to pages as they load. The content script reads only the page's domain to look up your snippet; it does not read or report page content.</td></tr>
+      <tr><td><code>storage</code></td><td>Saving your snippets, notes, and settings locally.</td></tr>
+      <tr><td><code>activeTab</code> / <code>scripting</code></td><td>Running the element picker, text-to-speech reader, and page actions on the current tab — only when you click those buttons in the popup.</td></tr>
+      <tr><td><code>tabs</code></td><td>Detecting the current site's domain, and powering the optional tab organizer (sort / group / close duplicates). Tab titles and URLs are read in-memory only and never stored or transmitted.</td></tr>
+      <tr><td><code>tabGroups</code></td><td>The optional "Group by domain" tab-organizer action (Chrome desktop only).</td></tr>
+      <tr><td><code>clipboardWrite</code></td><td>Copying a CSS selector or a generated password to your clipboard when you press Copy.</td></tr>
+      <tr><td><code>downloads</code> <em>(self-hosted builds only — not in the Chrome Web Store package)</em></td><td>Saving screenshots and page media through the browser's own download manager, at your explicit request.</td></tr>
+      <tr><td><code>contextMenus</code> <em>(self-hosted builds only — not in the Chrome Web Store package)</em></td><td>The right-click "Download this video" menu entry.</td></tr>
+    </table>
+
+    <h2>Changes to this policy</h2>
+    <p>If a future version of Pageside ever changes what data is handled, this document will be
+       updated and the change will be called out in the release notes before it ships.</p>
+
+    <h2>Contact</h2>
+    <p>Questions or concerns: open an issue at
+       <a href="https://github.com/Ranzlappen/web_extension/issues">github.com/Ranzlappen/web_extension/issues</a>
+       or see the <a href="/support/">support page</a>.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Ranzlappen · MIT license</span>
+      <span class="spacer"></span>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+      <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      <a href="https://ko-fi.com/F1F1140LWT">☕ Ko-fi</a>
+    </div>
+  </footer>
+</body>
+</html>

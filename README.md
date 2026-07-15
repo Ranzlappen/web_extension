@@ -337,6 +337,7 @@ opera/
 ├── store/                       ← Chrome Web Store listing copy, publishing guide, screenshots
 │   ├── chrome-web-store.md      ← listing text, permission justifications, submission walkthrough
 │   └── screenshots/             ← 1280×800 store screenshots (regenerate: tools/make-store-screenshots.mjs)
+├── site/                        ← static site → pageside.ranzlappen.com (homepage / support / privacy)
 ├── pwa-inventory.md             ← chrome.storage and manifest inventory (per repo standards)
 ├── PRIVACY.md                   ← privacy policy (linked from the Web Store listing)
 ├── CLAUDE.md                    ← architecture source of truth
