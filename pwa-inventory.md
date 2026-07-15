@@ -10,7 +10,7 @@ This inventory captures every key, path, and identifier whose value is part of t
 
 ## 1. Storage keys
 
-`chrome.storage.local` is the only persistent store. Keys are dynamic — one per saved domain — and computed by `getBaseDomain(hostname)` (last two labels of the hostname).
+`chrome.storage.local` is the only persistent store. Keys are dynamic — one per saved domain — and computed by `resolveBaseHost(hostname)`: last two labels of the hostname, or the last **three** labels when the last two are a listed two-level public suffix (`www.bbc.co.uk` → `bbc.co.uk`, not `co.uk`; the embedded suffix subset lives in `popup.js` / `content.js` and must stay in sync).
 
 | Key shape | Source of value | Type | Notes |
 | --- | --- | --- | --- |

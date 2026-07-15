@@ -215,7 +215,7 @@ There is no build step. Edit a file, then click **Reload** on the extension card
 
 1. Visit the site you want to style (e.g. `https://example.com`).
 2. Open the editor (toolbar icon on Chrome / Edge, sidebar on Opera / Firefox).
-3. The popup detects the **base domain** (e.g. `example.com` for `www.example.com`) and shows it under "Detected site".
+3. The popup detects the **base domain** (e.g. `example.com` for `www.example.com`; country suffixes are handled, so `www.bbc.co.uk` maps to `bbc.co.uk`, not `co.uk`) and shows it under "Detected site".
 4. Type or paste your CSS:
    ```css
    body { background: #0f121c; color: #e6e8ef; }
