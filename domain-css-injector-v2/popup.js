@@ -92,9 +92,56 @@ function speak(text) {
     showStatus('Speech failed to start.', 3000);
   }
 }
+// Two-label public suffixes under which real sites register a third label
+// (www.bbc.co.uk must resolve to bbc.co.uk, NOT to co.uk — a bare two-label
+// cut would make one site's CSS/notes apply to every .co.uk site). This is a
+// deliberately small subset of the Public Suffix List covering the widely
+// used ccTLD second-level zones. KEEP IN SYNC with the copy in content.js.
+const PS_TWO_LABEL_SUFFIXES = new Set((
+    'co.uk org.uk net.uk gov.uk ac.uk sch.uk me.uk ltd.uk plc.uk nhs.uk ' +
+    'com.au net.au org.au edu.au gov.au asn.au id.au ' +
+    'co.nz net.nz org.nz govt.nz ac.nz school.nz geek.nz ' +
+    'co.jp or.jp ne.jp ac.jp go.jp ed.jp gr.jp lg.jp ' +
+    'co.kr or.kr ne.kr go.kr re.kr pe.kr ac.kr ' +
+    'com.br net.br org.br gov.br edu.br art.br blog.br ' +
+    'com.mx org.mx net.mx gob.mx edu.mx ' +
+    'com.ar org.ar net.ar gob.ar edu.ar ' +
+    'com.co org.co net.co edu.co gov.co ' +
+    'com.pe org.pe net.pe gob.pe edu.pe ' +
+    'com.ve org.ve net.ve gob.ve ' +
+    'com.uy com.ec com.py com.bo com.do com.gt com.sv com.hn com.ni com.pa co.cr ' +
+    'co.za org.za net.za gov.za ac.za web.za ' +
+    'co.in net.in org.in gov.in ac.in gen.in firm.in ind.in res.in edu.in ' +
+    'com.sg org.sg net.sg edu.sg gov.sg ' +
+    'com.hk org.hk net.hk edu.hk gov.hk idv.hk ' +
+    'com.tw org.tw net.tw edu.tw gov.tw idv.tw ' +
+    'com.cn net.cn org.cn gov.cn edu.cn ac.cn ' +
+    'com.my net.my org.my gov.my edu.my ' +
+    'co.id or.id ac.id go.id web.id sch.id my.id ' +
+    'com.ph org.ph net.ph gov.ph edu.ph ' +
+    'com.vn net.vn org.vn gov.vn edu.vn ' +
+    'co.th or.th ac.th go.th in.th net.th ' +
+    'com.tr org.tr net.tr gov.tr edu.tr bel.tr k12.tr ' +
+    'co.il org.il net.il gov.il ac.il muni.il ' +
+    'com.sa org.sa net.sa gov.sa edu.sa med.sa sch.sa ' +
+    'co.ae net.ae org.ae gov.ae ac.ae ' +
+    'com.eg org.eg net.eg gov.eg edu.eg ' +
+    'com.ng org.ng net.ng gov.ng edu.ng ' +
+    'co.ke or.ke ne.ke go.ke ac.ke sc.ke ' +
+    'com.pk org.pk net.pk gov.pk edu.pk ' +
+    'com.bd org.bd net.bd gov.bd edu.bd ac.bd ' +
+    'com.ua org.ua net.ua gov.ua edu.ua in.ua ' +
+    'com.pl org.pl net.pl edu.pl gov.pl waw.pl ' +
+    'com.es org.es gob.es nom.es edu.es ' +
+    'com.gr org.gr net.gr edu.gr gov.gr ' +
+    'co.at or.at ac.at gv.at ' +
+    'co.rs org.rs edu.rs in.rs'
+).split(' '));
 function resolveBaseHost(hostname) {
-    const parts = hostname.split('.').reverse();
-    return parts.length > 2 ? `${parts[1]}.${parts[0]}` : hostname;
+    const parts = hostname.split('.');
+    if (parts.length <= 2) return hostname;
+    const take = PS_TWO_LABEL_SUFFIXES.has(parts.slice(-2).join('.')) ? 3 : 2;
+    return parts.slice(-take).join('.');
 }
 // chrome.tabs.query is promise-based on MV3 Chrome, but several mobile
 // Chromium forks (Kiwi, older builds) ship the callback-only signature and
