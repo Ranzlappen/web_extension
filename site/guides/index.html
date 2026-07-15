@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guides — Pageside</title>
+  <meta name="description" content="Download Pageside and install it on desktop Chrome, Edge, Opera, or an Android browser like Kiwi — full step-by-step guides.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/icon.png" alt="Pageside icon">Pageside</a>
+      <nav>
+        <a href="/#features">Features</a>
+        <a href="/guides/">Guides</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/support/">Support</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap prose">
+    <h1>Guides</h1>
+    <p class="sub">Download Pageside and get it running — on your computer or your phone.</p>
+
+    <h2 id="download">Download</h2>
+    <table>
+      <tr><th>Build</th><th>For</th><th>Download</th></tr>
+      <tr>
+        <td><strong>Desktop</strong> (Manifest V3)</td>
+        <td>Chrome, Edge, Opera, Brave and other desktop Chromium browsers; Firefox</td>
+        <td><a href="/downloads/pageside-desktop.zip" download>pageside-desktop.zip</a></td>
+      </tr>
+      <tr>
+        <td><strong>Android</strong> (Manifest V2)</td>
+        <td>Kiwi, Mises, Lemur, Yandex and other Android Chromium browsers with extension support</td>
+        <td><a href="/downloads/pageside-kiwi.zip" download>pageside-kiwi.zip</a></td>
+      </tr>
+    </table>
+    <p>Current version: <strong>3.0.1</strong>. Stock Chrome on Android does <em>not</em> support
+       extensions — use one of the Android browsers listed above.</p>
+
+    <h2 id="desktop">Install on desktop (Chrome / Edge / Opera / Brave)</h2>
+    <ul>
+      <li>Download <a href="/downloads/pageside-desktop.zip" download>pageside-desktop.zip</a> and
+          <strong>unzip it</strong> into a folder you'll keep (the browser loads the extension from
+          that folder, so don't delete it afterwards).</li>
+      <li>Open <code>chrome://extensions</code> (or <code>opera://extensions</code> /
+          <code>edge://extensions</code>).</li>
+      <li>Toggle <strong>Developer mode</strong> on — the switch is in the top-right corner.</li>
+      <li>Click <strong>Load unpacked</strong> and select the unzipped folder (the one containing
+          <code>manifest.json</code>).</li>
+      <li>Pin the Pageside icon to the toolbar so the popup is one click away. On Opera and Firefox
+          you can also open Pageside from the <strong>sidebar</strong>.</li>
+    </ul>
+
+    <h2 id="mobile">Install on Android (Kiwi Browser — step by step)</h2>
+    <p>Kiwi is the most popular Android browser with extension support. These steps assume you've
+       never sideloaded an extension before.</p>
+    <ul>
+      <li>On your phone, download
+          <a href="/downloads/pageside-kiwi.zip" download>pageside-kiwi.zip</a> — it lands in your
+          <strong>Downloads</strong> folder. <em>Use this Android build, not the desktop one:</em>
+          Kiwi silently does nothing when you load the desktop (Manifest V3) zip.</li>
+      <li>Open <strong>Kiwi Browser</strong>, type <code>kiwi://extensions</code> in the address bar
+          and go (or tap the <strong>⋮</strong> menu → <strong>Extensions</strong>).</li>
+      <li>Turn <strong>Developer mode</strong> ON — the toggle is in the top-right corner. New
+          buttons appear once it's on.</li>
+      <li>Tap <strong>+ (from .zip/.crx/.user.js)</strong>, navigate to <strong>Downloads</strong>,
+          and tap <code>pageside-kiwi.zip</code>.</li>
+      <li>Confirm the permissions prompt. Pageside now appears in the extensions list with its
+          toggle ON.</li>
+      <li>To use it: tap <strong>⋮</strong> — installed extensions are listed near the bottom of the
+          menu. Tap <strong>Pageside</strong> and the panel opens.</li>
+    </ul>
+    <p><strong>Mises / Lemur:</strong> identical flow (⋮ → Extensions → Developer mode → install
+       from zip). <strong>Yandex:</strong> rename the file from <code>.zip</code> to
+       <code>.crx</code> first, then open it from your file manager.</p>
+
+    <h2 id="verify">Verify it works</h2>
+    <ul>
+      <li>Visit any normal website (extensions can't run on browser-internal pages like
+          <code>chrome://…</code> or the new-tab page).</li>
+      <li>Open the Pageside panel — the <strong>Detected site</strong> label should show the site's
+          base domain, e.g. <code>example.com</code>.</li>
+      <li>Quick smoke test: expand <strong>Style</strong>, type
+          <code>body { background: #102030; }</code>, tap <strong>Save Style Changes</strong> — the
+          page background changes immediately, and stays changed on every future visit.</li>
+    </ul>
+
+    <h2 id="first-style">Your first style, in 30 seconds</h2>
+    <ul>
+      <li><strong>Try before saving:</strong> type CSS and hit <strong>Preview on Page</strong> — the
+          page updates instantly; reload to discard, or <strong>Save</strong> to keep.</li>
+      <li><strong>Start from a preset:</strong> Dark mode, Hide sticky/cookie bars, Readable text, or
+          Bigger text — each is appended to the editor for you to tune.</li>
+      <li><strong>Don't know the selector?</strong> <strong>Select Container</strong> copies the
+          exact CSS selector of anything you click. <strong>Hide Element</strong> removes the clicked
+          element from the site permanently (undo by deleting the saved rule).</li>
+      <li><strong>Back up:</strong> Tools → <strong>Export JSON</strong> saves every site's styles to
+          a file; <strong>Import JSON</strong> restores them on any machine.</li>
+    </ul>
+
+    <h2>Updating</h2>
+    <ul>
+      <li><strong>Desktop:</strong> download the new zip, unzip it over the same folder, then click
+          the <strong>reload</strong> (circular arrow) icon on the extension card in
+          <code>chrome://extensions</code>.</li>
+      <li><strong>Android:</strong> install the new zip the same way as the first time — it replaces
+          the old version. Your styles and notes are kept (they live in browser storage, not in the
+          extension files).</li>
+    </ul>
+
+    <p>Stuck? Head to the <a href="/support/">support page</a> — the FAQ covers the common issues,
+       and you can reach a human by email.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Ranzlappen · MIT license</span>
+      <span class="spacer"></span>
+      <a href="/guides/">Guides</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+    </div>
+  </footer>
+</body>
+</html>

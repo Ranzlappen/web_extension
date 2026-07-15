@@ -39,3 +39,6 @@ desktop.ini
 *.tmp
 *.bak
 *.orig
+
+# Hosted download artifacts served by the GitHub Pages site (site/downloads/)
+!site/downloads/*.zip

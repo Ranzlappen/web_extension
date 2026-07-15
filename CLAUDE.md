@@ -33,6 +33,7 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 * **Permissions are intentionally narrow.** Active operations use `activeTab` + `scripting` so the extension only touches a tab when the user opens the popup. `contextMenus` is held by the background service worker only, for the right-click "Download this video" entry. `tabs` backs both the active-site detection and the **Tabs** organizer (sort / dedupe / list across windows). `tabGroups` backs only the organizer's _Group by domain_ action — it is **Chrome/Edge-desktop only**, feature-detected at runtime (`typeof chrome.tabs.group === 'function'`), and **stripped from the MV2 (Kiwi) build** by `tools/build-kiwi-manifest.mjs` (Kiwi/Firefox have no tab-groups API). Don't expand host access further without a feature that requires it.
 * **Media saver stays site-generic.** The video pipeline may only surface generic sources (`<video>`/`<source>` src, media-typed links, performance resource entries) and must never carry site-specific extraction (e.g. YouTube player-response parsing) — Chrome Web Store policy prohibits facilitating YouTube downloads and that code was deliberately removed before the store submission. Don't reintroduce it.
 * **Derived Chrome Web Store build.** The store package (`pageside-<version>-store.zip`) is derived from the source by `tools/build-store-package.mjs`: every region fenced by `__PS_STORE_STRIP_START__` / `__PS_STORE_STRIP_END__` markers (JS block comments in `popup.js`, HTML + CSS comments in `popup.html`) is removed — currently the whole Capture (screenshot) and Media (video download) surface — along with `background.js`, the `downloads` / `contextMenus` permissions, and the Opera/Firefox-only manifest keys (`sidebar_action`, `browser_specific_settings`, `background`); the manifest `description` is overridden to omit the media saver. When touching Capture/Media code, keep it inside the strip markers; the build script fails loudly if a stripped symbol leaks outside a fenced region. CI validates the derived package on every push. Store listing copy and the submission guide live in `store/chrome-web-store.md`.
+* **The Pages site is self-contained.** Pages under `site/` must not link off-site — no GitHub, no Ko-fi, no external CDNs (the repo intentionally isn't referenced because it documents features the store build doesn't ship). Support contact is `mailto:info@ranzlappen.com`. The install zips are hosted on the site itself under `site/downloads/` (a `.gitignore` exception tracks them): `pageside-desktop.zip` (full MV3) and `pageside-kiwi.zip` (MV2). **On each release, refresh both zips and the version string in `site/guides/index.html`.** Anything that would have linked to GitHub links to a mirrored sub-page instead (`/guides/` for install docs).
 * **No external network.** Snippets are local-only. There is no telemetry, no remote config, no auth. Adding a network call is a structural change and should be a separate PR.
 * **Vanilla JS, no dependencies.** No npm, no bundler. Keep it that way unless a feature genuinely cannot be done without a dep.
 
@@ -97,10 +98,12 @@ opera/
 ├── store/
 │   ├── chrome-web-store.md      # Web Store listing copy, permission justifications, publish guide
 │   └── screenshots/             # generated 1280×800 store screenshots
-├── site/                        # static GitHub Pages site — pageside.ranzlappen.com (no build step)
+├── site/                        # static GitHub Pages site — pageside.ranzlappen.com (no build step, self-contained: no external links)
 │   ├── index.html               # homepage (Web Store "Homepage URL")
-│   ├── support/index.html       # FAQ + contact (Web Store "Support URL")
+│   ├── guides/index.html        # install/download docs — the on-site mirror of the README guides
+│   ├── support/index.html       # FAQ + mailto contact (Web Store "Support URL")
 │   ├── privacy/index.html       # hosted mirror of PRIVACY.md (Web Store privacy-policy URL)
+│   ├── downloads/               # hosted install zips (gitignore exception) — refresh on release
 │   ├── style.css / 404.html / CNAME / assets/
 ├── .github/
 │   ├── dependabot.yml           # weekly GitHub Actions updates
