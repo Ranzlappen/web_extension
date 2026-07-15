@@ -41,6 +41,7 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 | Workflow | Trigger | Scope | Deploys |
 | --- | --- | --- | --- |
 | `ci.yml` | PR / push touching `domain-css-injector-v2/**`, `tools/**`, or workflow itself | Validates `manifest.json`, runs `node --check` over each `.js`, confirms icon assets exist, validates the derived Kiwi MV2 manifest (version/name parity, MV2 shape), and validates the derived Chrome Web Store package (strip integrity, trimmed permissions/keys) | Nothing (validation only) |
+| `pages.yml` | push to `main` touching `site/**` or the workflow itself; manual dispatch | Deploys the static site in `site/` (homepage / support / privacy pages for the Web Store listing) to GitHub Pages at `pageside.ranzlappen.com` | GitHub Pages |
 | `release.yml` | tag push `v*` or manual dispatch | Validates, then builds **three** zips: `pageside-<version>.zip` (Manifest V3, desktop), `pageside-<version>-kiwi.zip` (Manifest V2 for Kiwi / Android, derived via `tools/build-kiwi-zip.sh`), and `pageside-<version>-store.zip` (Chrome Web Store build, derived via `tools/build-store-zip.sh` with Capture/Media stripped); verifies `manifest.json` lands at each zip root | Uploads both as workflow artifacts and attaches both to a GitHub Release. **Manual dispatch auto-increments**: pick `patch`/`minor`/`major` and the workflow bumps `manifest.json`, commits the bump `[skip ci]`, pushes the `vX.Y.Z` tag, and publishes the Release — no manual version edit or tagging. Tag pushes release at that exact tag with no bump. |
 
 **What fires on a given change:**
@@ -49,8 +50,9 @@ No build step. Load the extension unpacked, then click **Reload** on the extensi
 | --- | --- | --- |
 | Extension source in `domain-css-injector-v2/` | ✓ | — (release via tag push or dispatch) |
 | Build helpers in `tools/` | ✓ | — |
+| Site in `site/` | — | ✓ (GitHub Pages on push to `main` — extension CI/release never fire on `site/**`, and `pages.yml` never fires on extension files) |
 | Docs (`README.md`, `CLAUDE.md`, `pwa-inventory.md`) | — | — |
-| `.github/workflows/*.yml` | ✓ | — |
+| `.github/workflows/*.yml` | ✓ (`ci.yml` only for itself) | `pages.yml` for itself |
 | Tag `v*` pushed | ✓ | ✓ (zip + GitHub Release) |
 | Manual `release.yml` dispatch | — (bump commit is `[skip ci]`) | ✓ (auto-bump + tag + zip + GitHub Release) |
 
@@ -95,10 +97,16 @@ opera/
 ├── store/
 │   ├── chrome-web-store.md      # Web Store listing copy, permission justifications, publish guide
 │   └── screenshots/             # generated 1280×800 store screenshots
+├── site/                        # static GitHub Pages site — pageside.ranzlappen.com (no build step)
+│   ├── index.html               # homepage (Web Store "Homepage URL")
+│   ├── support/index.html       # FAQ + contact (Web Store "Support URL")
+│   ├── privacy/index.html       # hosted mirror of PRIVACY.md (Web Store privacy-policy URL)
+│   ├── style.css / 404.html / CNAME / assets/
 ├── .github/
 │   ├── dependabot.yml           # weekly GitHub Actions updates
 │   └── workflows/
 │       ├── ci.yml               # validation
+│       ├── pages.yml            # deploys site/ to GitHub Pages (site/** only)
 │       └── release.yml          # zip + GitHub Release on v* tag
 ├── pwa-inventory.md             # storage / manifest inventory
 ├── PRIVACY.md                   # privacy policy — linked from the Web Store listing

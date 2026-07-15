@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — Pageside</title>
+  <meta name="description" content="Get help with the Pageside browser extension: FAQ, troubleshooting, and how to report a bug.">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/icon.png" alt="Pageside icon">Pageside</a>
+      <nav>
+        <a href="/#features">Features</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/support/">Support</a>
+        <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap prose">
+    <h1>Support</h1>
+    <p class="sub">Answers to the common questions first — and how to reach a human below.</p>
+
+    <h2>Get help / report a bug</h2>
+    <p>The fastest way to get help is a
+      <a href="https://github.com/Ranzlappen/web_extension/issues">GitHub issue</a> — you'll need a
+      free GitHub account. Please include your browser and version, what you did, what you expected,
+      and what happened instead. Bug reports, feature requests, and questions are all welcome.</p>
+    <p>If Pageside saves you time and you feel like saying thanks, there's a
+      <a href="https://ko-fi.com/F1F1140LWT">Ko-fi page</a> — entirely optional, every feature is
+      free for everyone.</p>
+
+    <h2>Frequently asked questions</h2>
+
+    <details class="faq">
+      <summary>My CSS isn't applying to the page</summary>
+      <div class="faq-body">
+        <p>Open the popup <em>on the page you want to style</em> and check three things:</p>
+        <ul>
+          <li>The <strong>Detected site</strong> label matches the site (e.g. <code>example.com</code>).</li>
+          <li><strong>Apply style on this site</strong> is ticked — the per-site switch keeps the
+              snippet saved but skips injection when unticked.</li>
+          <li>You clicked <strong>Save Style Changes</strong>, not just Preview (previews vanish on reload).</li>
+        </ul>
+        <p>If the site's own styles win, add <code>!important</code> to your rules. Browser-internal
+           pages (<code>chrome://…</code>, the extension store) are off-limits to all extensions.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Which sites share one style? (subdomains, co.uk domains)</summary>
+      <div class="faq-body">
+        <p>Styles are saved per <strong>base domain</strong>: <code>www.example.com</code>,
+           <code>shop.example.com</code>, and <code>example.com</code> all share one snippet. Country
+           suffixes are handled — <code>www.bbc.co.uk</code> maps to <code>bbc.co.uk</code>, not to
+           <code>co.uk</code>, so different <code>.co.uk</code> sites keep separate styles.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>The popup says "Could not detect the site"</summary>
+      <div class="faq-body">
+        <p>Open the popup while a normal web page is in front (not a new-tab page or a
+           <code>chrome://</code> page), then tap the message to retry. On some Android browsers
+           detection takes a beat — reopening the popup on the page also fixes it.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>I loaded the zip on Android (Kiwi) and nothing happened</summary>
+      <div class="faq-body">
+        <p>That's the Manifest V3 zip — Kiwi and most Android Chromium forks silently reject it. Use
+           the <strong><code>-kiwi.zip</code></strong> (Manifest V2) build from the
+           <a href="https://github.com/Ranzlappen/web_extension/releases/latest">latest release</a>.
+           Also make sure <code>manifest.json</code> sits at the <em>root</em> of the zip, not inside a
+           folder. Full walkthrough: <a href="https://github.com/Ranzlappen/web_extension#mobile-installation">mobile installation guide</a>.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I back up or move my styles?</summary>
+      <div class="faq-body">
+        <p><strong>Export JSON</strong> in the popup's Tools section writes all snippets to a file;
+           <strong>Import JSON</strong> merges them back in on any machine. Private notes are never
+           included in exports. Uninstalling the extension deletes all local data, so export first.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I undo "Hide Element"?</summary>
+      <div class="faq-body">
+        <p>Hide Element appends a <code>display: none</code> rule to the site's saved CSS. Open the
+           popup on that site and delete that line in the editor (it names the selector it hid), then
+           save.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Why does Chrome say the extension can "read my browsing history"?</summary>
+      <div class="faq-body">
+        <p>That's Chrome's standard wording for the <code>tabs</code> permission, which powers the
+           site detection and the tab organizer (sort / group / close duplicates). Pageside reads tab
+           titles and URLs in memory only — nothing is stored or transmitted. See the
+           <a href="/privacy/">privacy policy</a>.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Does Pageside collect any data?</summary>
+      <div class="faq-body">
+        <p>No. There is no server, no analytics, and no tracking. Everything you create stays in your
+           browser's local extension storage. The <a href="/privacy/">privacy policy</a> has the full
+           breakdown of what is stored locally and why each permission exists.</p>
+      </div>
+    </details>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Ranzlappen · MIT license</span>
+      <span class="spacer"></span>
+      <a href="/privacy/">Privacy</a>
+      <a href="/support/">Support</a>
+      <a href="https://github.com/Ranzlappen/web_extension">GitHub</a>
+      <a href="https://ko-fi.com/F1F1140LWT">☕ Ko-fi</a>
+    </div>
+  </footer>
+</body>
+</html>

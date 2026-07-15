@@ -36,6 +36,7 @@ const v2 = {
   name: m.name,
   version: m.version,
   description: m.description,
+  ...(m.homepage_url ? { homepage_url: m.homepage_url } : {}),
   permissions,
   icons: m.icons,
   // MV3 action -> MV2 browser_action.

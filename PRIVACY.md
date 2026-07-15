@@ -1,6 +1,10 @@
 # Pageside — Privacy Policy
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-15_
+
+> This document is mirrored at <https://pageside.ranzlappen.com/privacy/>
+> (`site/privacy/index.html`) — the URL the Chrome Web Store listing links to.
+> Keep both in sync when the policy changes.
 
 Pageside is a browser extension that lets you save a custom CSS snippet per
 website, plus a small set of page tools (element picker, text-to-speech
