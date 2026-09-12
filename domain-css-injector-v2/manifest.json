@@ -61,8 +61,20 @@
         "<all_urls>"
       ],
       "js": [
+        "ps-hotkeys.js",
         "content.js"
       ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "ps-hotkeys.js",
+        "content-hotkeys.js"
+      ],
+      "all_frames": true,
       "run_at": "document_start"
     }
   ]

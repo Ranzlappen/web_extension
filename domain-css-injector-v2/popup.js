@@ -195,21 +195,25 @@ function injectFunc(tabId, func, { allFrames = false } = {}) {
         });
     });
 }
+// Accepts one file or an ordered list (content.js depends on ps-hotkeys.js
+// being evaluated first, so load order matters on the re-injection path).
 function injectFile(tabId, file) {
+    const files = Array.isArray(file) ? file : [file];
     if (chrome.scripting && chrome.scripting.executeScript) {
         return new Promise((resolve, reject) => {
-            chrome.scripting.executeScript({ target: { tabId }, files: [file] }, () => {
+            chrome.scripting.executeScript({ target: { tabId }, files }, () => {
                 if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
                 else resolve();
             });
         });
     }
-    return new Promise((resolve, reject) => {
-        chrome.tabs.executeScript(tabId, { file }, () => {
+    // MV2 injects a single file per call — chain them to preserve that order.
+    return files.reduce((prev, f) => prev.then(() => new Promise((resolve, reject) => {
+        chrome.tabs.executeScript(tabId, { file: f }, () => {
             if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
             else resolve();
         });
-    });
+    })), Promise.resolve());
 }
 function showStatus(text, timeout = 2000) {
     const statusEl = document.getElementById('status');
@@ -545,7 +549,7 @@ function messageTab(tabId, msg) {
                 resolve(resp);
                 return;
             }
-            injectFile(tabId, 'content.js').then(() => {
+            injectFile(tabId, ['ps-hotkeys.js', 'content.js', 'content-hotkeys.js']).then(() => {
                 chrome.tabs.sendMessage(tabId, msg, (resp2) => {
                     if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message || 'Page not reachable'));
                     else resolve(resp2);

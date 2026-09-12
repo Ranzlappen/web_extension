@@ -73,6 +73,8 @@ jobs:
             if((k.permissions||[]).includes('scripting')) fail(\"'scripting' is invalid in MV2\");
             if(!(k.permissions||[]).includes('<all_urls>')) fail('MV2 build needs <all_urls> host permission');
             if(!k.background||k.background.persistent!==false) fail('MV2 background must be a non-persistent event page');
+            if(JSON.stringify(k.content_scripts)!==JSON.stringify(mv3.content_scripts))
+              fail('Kiwi/MV3 content-script drift');
             console.log('Kiwi MV2 manifest OK (v'+k.version+')');
           "
 
@@ -93,8 +95,13 @@ jobs:
             if(s.name!==mv3.name) fail('Store/MV3 name drift');
             for(const p of ['downloads','contextMenus'])
               if((s.permissions||[]).includes(p)) fail(p+' must be stripped from the store build');
-            for(const k of ['background','sidebar_action','browser_specific_settings'])
+            for(const k of ['sidebar_action','browser_specific_settings'])
               if(k in s) fail(k+' must be stripped from the store manifest');
-            if(fs.existsSync('/tmp/store-pkg/background.js')) fail('background.js must not ship in the store build');
+            // The worker still ships — it routes the hotkey tab actions — but
+            // only as an MV3 service worker (the Firefox fallback is dropped).
+            if(!s.background||s.background.service_worker!=='background.js')
+              fail('store manifest must keep background.service_worker (hotkey router)');
+            if(s.background.scripts) fail('background.scripts must be stripped from the store manifest');
+            if(!fs.existsSync('/tmp/store-pkg/background.js')) fail('background.js must ship in the store build');
             console.log('Store package OK (v'+s.version+')');
           "

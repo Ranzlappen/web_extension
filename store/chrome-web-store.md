@@ -6,9 +6,10 @@ the **store zip** built by `release.yml` (`pageside-<version>-store.zip`) —
 download it from the GitHub Release assets, **not** from the Actions artifacts
 UI (which double-wraps the zip). The store build is derived from the source by
 `tools/build-store-package.mjs`: the Capture (screenshot) and Media (video
-download) features are stripped, the unused `downloads` / `contextMenus`
-permissions and the background worker are removed, and the Opera/Firefox-only
-manifest keys are dropped. Those features remain in the regular
+download) features are stripped — including the context-menu half of the
+background worker — the unused `downloads` / `contextMenus` permissions are
+removed, and the Opera/Firefox-only manifest keys are dropped. The worker
+itself still ships: it routes the page hotkeys' tab actions. Those features remain in the regular
 `pageside-<version>.zip` for self-hosted installs.
 
 ---
@@ -25,9 +26,10 @@ manifest keys are dropped. Those features remain in the regular
 ## 2. Upload
 
 1. Dashboard → **Items** → **New item** → upload `pageside-<version>-store.zip`.
-2. The store manifest is pre-trimmed for Chrome (no `sidebar_action`,
-   `browser_specific_settings`, or `background` keys), so the upload should
-   produce no manifest warnings.
+2. The store manifest is pre-trimmed for Chrome (no `sidebar_action` or
+   `browser_specific_settings` keys, and the Firefox `background.scripts`
+   fallback removed — only `background.service_worker` remains), so the upload
+   should produce no manifest warnings.
 
 ## 3. Store listing tab
 
@@ -37,7 +39,7 @@ manifest keys are dropped. Those features remain in the regular
 description set by `tools/build-store-package.mjs`):
 
 > Per-site custom CSS with live preview, element picker and hider,
-> text-to-speech reader, site notes, and a tab organizer.
+> text-to-speech, site notes, page hotkeys, and a tab organizer.
 
 **Category:** Productivity → Developer Tools (or Accessibility — pick one;
 Developer Tools fits the CSS editor best).
@@ -90,6 +92,10 @@ MOVE BETWEEN YOUR SITES
 • Tab organizer: sort your open tabs by domain, title, or URL; group
   same-site tabs together; close duplicates; filter and jump to any tab
   across all windows
+• Page hotkeys: silence the tab you're on — or every other tab at once —
+  turn the volume of whatever is playing up or down, and start the element
+  picker, all without opening the panel. Every shortcut is listed in the
+  panel and can be re-bound to whatever you prefer
 
 PRIVACY, PLAINLY
 Pageside has no server and sends nothing anywhere. Your styles, notes, and
@@ -131,7 +137,7 @@ https://ko-fi.com/F1F1140LWT — entirely optional, nothing is ever locked.
 | `storage` | Saves the user's per-site CSS snippets, per-site notes, and editor drafts locally so they persist between visits. Nothing is transmitted. |
 | `activeTab` | Lets popup-initiated actions (element picker, read-aloud, screenshot, media scan) run on the tab the user is looking at, only when the user clicks the corresponding button. |
 | `scripting` | Injects the small helper functions that power the popup-initiated actions above into the active tab. No remote code; all scripts ship in the package. |
-| `tabs` | Reads the active tab's URL to detect which site's CSS snippet to load in the editor, and powers the tab organizer (sort, group, close duplicates, jump to tab). Tab data is used in-memory only. |
+| `tabs` | Reads the active tab's URL to detect which site's CSS snippet to load in the editor, powers the tab organizer (sort, group, close duplicates, jump to tab), and lets the user's mute hotkeys silence the current tab or all other tabs. Tab data is used in-memory only. |
 | `tabGroups` | Used solely by the tab organizer's optional "Group by domain" action to create native tab groups on Chrome desktop. |
 | `clipboardWrite` | Copies a CSS selector or a generated password to the clipboard when the user presses a Copy button. |
 | Host permission `<all_urls>` | The core feature applies the user's saved CSS to sites as they load; the content script must run at document_start on any site the user has styled. It reads only the page's hostname to look up the user's snippet and injects only the user's own CSS. |

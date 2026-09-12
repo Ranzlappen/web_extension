@@ -46,6 +46,7 @@
       <tr><td>Unsaved editor drafts</td><td>So closing the popup mid-edit loses nothing</td><td>Local extension storage only</td></tr>
       <tr><td>Per-site on/off toggle state</td><td>So a disabled site stays disabled</td><td>Local extension storage only</td></tr>
       <tr><td>The domain of the page you last viewed</td><td>Used only as a fallback for site detection in the popup</td><td>Local extension storage only</td></tr>
+      <tr><td>Your hotkey settings (which key combination runs which action)</td><td>So your shortcuts work the way you set them</td><td>Local extension storage only</td></tr>
     </table>
     <p>Generated passwords are <strong>never stored anywhere</strong> — they exist only in the popup
        until you close it. Uninstalling the extension deletes all of this data. The Export JSON
@@ -59,7 +60,12 @@
       <li>The popup contains a "Support this project" text link to the developer's Ko-fi page.
           It is a plain link: nothing is loaded from Ko-fi unless you click it, and clicking simply
           opens the page in a new browser tab.</li>
-      <li>No reading of passwords, form fields, or keystrokes on web pages.</li>
+      <li>No reading of passwords or form fields, and no keylogging. Pageside does watch for key
+          presses on the page so its hotkeys can work, but that check is a comparison against the
+          shortcut list you can see in the Hotkeys section: nothing you type is recorded, stored, or
+          sent anywhere, key presses inside text boxes and editable fields are ignored outright, and
+          the whole listener is switched off — not even registered — when you untick
+          <strong>Enable page hotkeys</strong>.</li>
       <li>No remote code — every line of code ships inside the extension package.</li>
       <li>No sale or transfer of user data to anyone, for any purpose.</li>
     </ul>
@@ -70,7 +76,7 @@
       <tr><td>Access to websites (<code>&lt;all_urls&gt;</code>)</td><td>Applying <strong>your own</strong> saved CSS to pages as they load. The content script reads only the page's domain to look up your snippet; it does not read or report page content.</td></tr>
       <tr><td><code>storage</code></td><td>Saving your snippets, notes, and settings locally.</td></tr>
       <tr><td><code>activeTab</code> / <code>scripting</code></td><td>Running the element picker, text-to-speech reader, and page actions on the current tab — only when you click those buttons in the popup.</td></tr>
-      <tr><td><code>tabs</code></td><td>Detecting the current site's domain, and powering the optional tab organizer (sort / group / close duplicates). Tab titles and URLs are read in-memory only and never stored or transmitted.</td></tr>
+      <tr><td><code>tabs</code></td><td>Detecting the current site's domain, powering the optional tab organizer (sort / group / close duplicates), and muting the current tab or your other tabs when you press the matching hotkey. Tab titles and URLs are read in-memory only and never stored or transmitted.</td></tr>
       <tr><td><code>tabGroups</code></td><td>The optional "Group by domain" tab-organizer action (Chrome desktop only).</td></tr>
       <tr><td><code>clipboardWrite</code></td><td>Copying a CSS selector or a generated password to your clipboard when you press Copy.</td></tr>
       <tr><td><code>downloads</code> <em>(zip builds from this site only — not in the Chrome Web Store package)</em></td><td>Saving screenshots and page media through the browser's own download manager, at your explicit request.</td></tr>
