@@ -62,6 +62,12 @@
         .tab-row{display:flex;gap:6px;align-items:stretch;margin:4px 0}
         .tab-open{flex:1 1 auto;width:auto;margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .tab-close{flex:0 0 44px;width:44px;margin:0;}
+        /* Hotkeys list — one row per action: label, current combo, Change button. */
+        .hk-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+        .hk-name{flex:1 1 auto;min-width:0;font-size:0.95em}
+        .hk-key{flex:0 0 auto;font-family:monospace;font-size:0.9em;white-space:nowrap;background:#161a26;border:1px solid #2a2f44;border-radius:6px;padding:8px 10px;color:#e6e8ef}
+        .hk-row button{flex:0 0 auto;width:auto;margin:0;padding:8px 12px;border-radius:8px}
+        .hk-row.recording .hk-key{border-color:#4aa3ff;color:#7fb7ff}
         /* Support footer — a plain text link (deliberately NOT the hosted
            Ko-fi button image: the popup must never fetch remote resources). */
         .footer{text-align:center;margin-top:14px;padding:6px 0}
@@ -178,6 +184,20 @@ body    {style:example;}
             </div>
         </details>
 
+        <details class="sec" id="hotkeysSection">
+            <summary>Hotkeys</summary>
+            <div class="sec-body">
+                <div class="hint">Shortcuts that work on the page you are viewing (not in the browser's own menus or on internal pages). They are ignored while you type in a text box.</div>
+                <label class="opt"><input type="checkbox" id="hkEnabled" checked> Enable page hotkeys</label>
+                <div id="hkList"></div>
+                <div id="hkNote" class="hint"></div>
+                <div class="controls">
+                    <button id="hkReset">Reset to defaults</button>
+                </div>
+                <div class="hint">Tap <b>Change</b>, then press the combination you want — Esc cancels. Changes apply to open pages right away.</div>
+            </div>
+        </details>
+
         <details class="sec" id="tabsSection">
             <summary>Tabs</summary>
             <div class="sec-body">
@@ -201,11 +221,15 @@ body    {style:example;}
         <div class="footer">
             <a id="kofiLink" href="https://ko-fi.com/F1F1140LWT" target="_blank" rel="noopener">☕ Support this project</a>
         </div>
+    <!-- Shared hotkey contract: also loaded as a content script, so it must
+         come before any module that reads window.PSHotkeys. -->
+    <script src="ps-hotkeys.js"></script>
     <script src="popup.js"></script>
     <script src="popup-editor.js"></script>
     <script src="popup-notepad.js"></script>
     <script src="popup-password.js"></script>
     <script src="popup-tabs.js"></script>
+    <script src="popup-hotkeys.js"></script>
 </body>
 
 </html>

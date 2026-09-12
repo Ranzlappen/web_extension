@@ -4,12 +4,14 @@
 //   1. The Capture (screenshot) and Media (video download) features are
 //      removed — every UI block and JS region fenced by the
 //      __PS_STORE_STRIP_START__ / __PS_STORE_STRIP_END__ markers is dropped,
-//      and background.js (whose only job is the "Download this video"
-//      context-menu entry) is excluded entirely.
+//      including the context-menu half of background.js. The worker itself
+//      still ships: it also routes the page hotkeys (tab mute / volume), which
+//      a content script cannot do on its own.
 //   2. The manifest is trimmed for Chrome: the now-unused `downloads` and
-//      `contextMenus` permissions are removed, along with the `background`
-//      worker and the Opera/Firefox-only keys (`sidebar_action`,
-//      `browser_specific_settings`) that only cause upload warnings.
+//      `contextMenus` permissions are removed, along with the Opera/Firefox
+//      only keys (`sidebar_action`, `browser_specific_settings`) and the
+//      Firefox event-page fallback (`background.scripts`), which only cause
+//      upload warnings.
 //
 // The source tree in domain-css-injector-v2/ stays the single source of
 // truth — never hand-maintain a store variant.
@@ -25,8 +27,9 @@ const SRC = join(ROOT, 'domain-css-injector-v2');
 const OUT = resolve(process.argv[2] || join(ROOT, 'dist', 'store-pkg'));
 
 const STRIPPED_PERMISSIONS = ['downloads', 'contextMenus'];
-const STRIPPED_MANIFEST_KEYS = ['background', 'sidebar_action', 'browser_specific_settings'];
-const EXCLUDED_FILES = ['background.js'];
+const STRIPPED_MANIFEST_KEYS = ['sidebar_action', 'browser_specific_settings'];
+// Sources carrying fenced Capture/Media regions, stripped in place below.
+const JS_STRIPPED_FILES = ['popup.js', 'background.js'];
 
 function stripRegions(text, markerPairs, file) {
   let stripped = text;
@@ -48,37 +51,43 @@ function stripRegions(text, markerPairs, file) {
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 for (const entry of readdirSync(SRC)) {
-  if (EXCLUDED_FILES.includes(entry)) continue;
   cpSync(join(SRC, entry), join(OUT, entry), { recursive: true });
 }
 
-// Strip the fenced Capture/Media regions out of the popup sources. popup.html
-// carries two marker styles: HTML comments in markup and CSS comments inside
-// its <style> block.
+// Strip the fenced Capture/Media regions out of the popup and worker sources.
+// popup.html carries two marker styles: HTML comments in markup and CSS
+// comments inside its <style> block.
 const JS_PAIR = ['/\\* __PS_STORE_STRIP_START__', '__PS_STORE_STRIP_END__ \\*/'];
 const HTML_PAIR = ['<!-- __PS_STORE_STRIP_START__', '__PS_STORE_STRIP_END__ -->'];
-writeFileSync(join(OUT, 'popup.js'),
-  stripRegions(readFileSync(join(SRC, 'popup.js'), 'utf8'), [JS_PAIR], 'popup.js'));
+for (const file of JS_STRIPPED_FILES) {
+  writeFileSync(join(OUT, file),
+    stripRegions(readFileSync(join(SRC, file), 'utf8'), [JS_PAIR], file));
+}
 writeFileSync(join(OUT, 'popup.html'),
   stripRegions(readFileSync(join(SRC, 'popup.html'), 'utf8'), [HTML_PAIR, JS_PAIR], 'popup.html'));
 
 // Trim the manifest. The description is overridden because the source one
 // mentions the media saver, which the store build does not ship.
-const STORE_DESCRIPTION = 'Per-site custom CSS with live preview, element picker and hider, text-to-speech reader, site notes, and a tab organizer.';
+const STORE_DESCRIPTION = 'Per-site custom CSS with live preview, element picker and hider, text-to-speech, site notes, page hotkeys, and a tab organizer.';
 const manifest = JSON.parse(readFileSync(join(SRC, 'manifest.json'), 'utf8'));
 manifest.description = STORE_DESCRIPTION;
 manifest.permissions = (manifest.permissions || []).filter((p) => !STRIPPED_PERMISSIONS.includes(p));
 for (const key of STRIPPED_MANIFEST_KEYS) delete manifest[key];
+// The service worker stays (it routes the hotkey tab actions); only the
+// Firefox-only event-page fallback is dropped, which Chrome warns about.
+if (manifest.background) delete manifest.background.scripts;
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
-// The stripped popup.js must still parse, and no stripped symbol may remain
+// Every stripped source must still parse, and no stripped symbol may remain
 // referenced anywhere in the package.
-const check = spawnSync('node', ['--check', join(OUT, 'popup.js')], { encoding: 'utf8' });
-if (check.status !== 0) {
-  throw new Error(`stripped popup.js failed node --check:\n${check.stderr}`);
+for (const file of JS_STRIPPED_FILES) {
+  const check = spawnSync('node', ['--check', join(OUT, file)], { encoding: 'utf8' });
+  if (check.status !== 0) {
+    throw new Error(`stripped ${file} failed node --check:\n${check.stderr}`);
+  }
 }
-const leftovers = /captureScreenshot|pickAndSaveMedia|collectMediaSources|downloadVideoBtn|screenshotBtn|mediaList|chrome\.downloads|chrome\.contextMenus/;
-for (const file of ['popup.js', 'popup.html']) {
+const leftovers = /captureScreenshot|pickAndSaveMedia|collectMediaSources|downloadVideoBtn|screenshotBtn|mediaList|ensureMenu|PS_DL_VIDEO_MENU_ID|chrome\.downloads|chrome\.contextMenus/;
+for (const file of [...JS_STRIPPED_FILES, 'popup.html']) {
   const body = readFileSync(join(OUT, file), 'utf8');
   const hit = body.match(leftovers);
   if (hit) throw new Error(`${file}: stripped build still references "${hit[0]}"`);

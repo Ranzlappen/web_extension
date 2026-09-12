@@ -30,6 +30,7 @@ All data lives exclusively in your browser's local extension storage
 | Unsaved editor drafts | So closing the popup mid-edit loses nothing | Local extension storage only |
 | Per-site on/off toggle state | So a disabled site stays disabled | Local extension storage only |
 | The domain of the page you last viewed | Used only as a fallback for site detection in the popup | Local extension storage only |
+| Your hotkey settings (which key combination runs which action) | So your shortcuts work the way you set them | Local extension storage only |
 
 Generated passwords are **never stored anywhere** — they exist only in the
 popup until you close it.
@@ -45,7 +46,13 @@ your device unless you move it yourself.
 * The popup contains a "Support this project" text link to the developer's
   Ko-fi page. It is a plain link: nothing is loaded from Ko-fi unless you
   click it, and clicking simply opens the page in a new browser tab.
-* No reading of passwords, form fields, or keystrokes on web pages.
+* No reading of passwords or form fields, and no keylogging. Pageside does
+  watch for key presses on the page so its hotkeys can work, but that check is
+  a comparison against the shortcut list you can see in the Hotkeys section:
+  nothing you type is recorded, stored, or sent anywhere, key presses inside
+  text boxes and editable fields are ignored outright, and the whole listener
+  is switched off — not even registered — when you untick **Enable page
+  hotkeys**.
 * No remote code — every line of code ships inside the extension package.
 * No sale or transfer of user data to anyone, for any purpose.
 
@@ -56,7 +63,7 @@ your device unless you move it yourself.
 | Access to websites (`<all_urls>`) | Applying **your own** saved CSS to pages as they load. The content script reads only the page's domain to look up your snippet; it does not read or report page content. |
 | `storage` | Saving your snippets, notes, and settings locally. |
 | `activeTab` / `scripting` | Running the element picker, text-to-speech reader, screenshot, and media scanner on the current tab — only when you click those buttons in the popup. |
-| `tabs` | Detecting the current site's domain, and powering the optional tab organizer (sort / group / close duplicates). Tab titles and URLs are read in-memory only and never stored or transmitted. |
+| `tabs` | Detecting the current site's domain, powering the optional tab organizer (sort / group / close duplicates), and muting the current tab or your other tabs when you press the matching hotkey. Tab titles and URLs are read in-memory only and never stored or transmitted. |
 | `tabGroups` | The optional "Group by domain" tab-organizer action (Chrome desktop only). |
 | `clipboardWrite` | Copying a CSS selector or a generated password to your clipboard when you press Copy. |
 | `downloads` *(self-hosted builds only — not in the Chrome Web Store package)* | Saving screenshots and page media through the browser's own download manager, at your explicit request. |

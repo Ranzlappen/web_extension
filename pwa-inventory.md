@@ -4,7 +4,7 @@ This repo is **not** a Progressive Web App — it is a Manifest V3 browser exten
 
 This inventory captures every key, path, and identifier whose value is part of the extension's external contract. **Every value below is sacred** and must round-trip identically through any refactor.
 
-> **Derived distribution note:** the Chrome Web Store package (`pageside-<version>-store.zip`, built by `tools/build-store-package.mjs`) ships a *subset* of this inventory — the Capture/Media surface, `background.js`, and the `downloads` / `contextMenus` permissions are stripped, and the Opera/Firefox-only manifest keys are removed. Every storage key, the injected style-element ids, and the message-channel types are identical across all builds, so data written by one build is fully readable by another.
+> **Derived distribution note:** the Chrome Web Store package (`pageside-<version>-store.zip`, built by `tools/build-store-package.mjs`) ships a *subset* of this inventory — the Capture/Media surface (including the context-menu half of `background.js`) and the `downloads` / `contextMenus` permissions are stripped, and the Opera/Firefox-only manifest keys are removed. `background.js` itself still ships there — it routes the hotkey tab actions. Every storage key, the injected style-element ids, and the message-channel types are identical across all builds, so data written by one build is fully readable by another.
 
 ---
 
@@ -19,10 +19,11 @@ This inventory captures every key, path, and identifier whose value is part of t
 | `__ps_lasthost` | `content.js` | `string` (base domain) | The foreground page's base host, written by the content script while the tab is visible. The popup reads it as a fallback for active-site detection when `chrome.tabs.query` is unreliable (Kiwi / Android forks). |
 | `__ps_off` | `popup.js` (written), `content.js` (read) | `object` (`{ "<base-domain>": true }`) | Domains whose saved CSS is temporarily switched off via the Style section's "Apply style on this site" toggle. The CSS snippet itself stays saved under the bare-domain key; `content.js` skips injection while the domain is listed and reacts live to changes. Re-enabling deletes the entry (the map only holds `true` values). |
 | `__ps_draft` | `popup-editor.js` | `object` (`{ "<base-domain>": { base, text } }`) | Unsaved CSS-editor drafts, debounce-written as the user types. `text` is the draft; `base` is the saved CSS the draft was typed against — on restore, a draft whose `base` no longer matches the current saved CSS is discarded as stale (e.g. Hide Element added a rule while the popup was closed). Cleared when a save/delete for the domain lands. |
+| `__ps_hotkeys` | `popup-hotkeys.js` (written), `content-hotkeys.js` (read) | `object` (`{ enabled: bool, bindings: { "<action>": "<combo>" } }`) | Page-hotkey config — **global, not per-domain**. Action ids are fixed (`selectContainer`, `muteTab`, `muteOthers`, `volumeUp`, `volumeDown`); a combo is modifiers-first in a fixed order plus the layout-independent `KeyboardEvent.code`, e.g. `Alt+Shift+KeyS`. An empty-string combo means that action is deliberately unbound. Missing / corrupt entries fall back to the defaults in `ps-hotkeys.js` (`PSHotkeys.normalize`), so the key may be absent entirely — the defaults are then in force. `content-hotkeys.js` watches it via `chrome.storage.onChanged` and attaches / detaches its `keydown` listener live. |
 
 ### Reserved `__ps_` prefix
 
-All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`, `__ps_off`, `__ps_draft`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Three invariants protect this:
+All **non-CSS** internal keys are namespaced under the reserved `__ps_` prefix (currently `__ps_notes`, `__ps_lasthost`, `__ps_off`, `__ps_draft`, `__ps_hotkeys`). Because a leading `__ps_` can never be a real hostname, these keys can never collide with the bare-domain CSS keys. Three invariants protect this:
 
 * `renderSnippets()` in `popup.js` filters out any key matching `isReservedKey(k)` (`k.startsWith('__ps_')`) so internal keys never appear as fake CSS snippets.
 * **Export JSON** strips the same prefix so private notes never leak into a shared snippet backup.
@@ -51,7 +52,7 @@ None. There is no migration pipeline, no `schemaVersion` constant, and no versio
 
 ## 3. Service worker
 
-The extension ships a single MV3 background service worker at `domain-css-injector-v2/background.js`, declared in the manifest as:
+The extension ships a single MV3 background service worker at `domain-css-injector-v2/background.js`. Its main job is executing the page hotkeys — content scripts cannot reach `chrome.tabs`, so they post the action here — and it also owns the context-menu video download. It is declared in the manifest as:
 
 ```jsonc
 // manifest.json
@@ -69,24 +70,35 @@ works under either runtime. Chrome ignores `scripts`; Firefox ignores
 
 It subscribes to:
 
+* `chrome.runtime.onMessage` — the hotkey router. `PS_HOTKEY` (posted by `content-hotkeys.js` with the action id) mutes / unmutes `sender.tab` or every other tab via `chrome.tabs.update({ muted })`, broadcasts a `PS_VOLUME` step to the tab's frames, or starts the element picker in frame 0; `PS_VOL_RESULT` is the answer from whichever frame owned media, and decides the confirmation toast.
 * `chrome.runtime.onInstalled` — registers the `chrome.contextMenus` entry once at install.
 * `chrome.runtime.onStartup` — re-registers the same entry per session (defensive — `onInstalled` only fires on install / update).
 * `chrome.contextMenus.onClicked` — when the user picks **Download this video** on a `<video>` element, it forwards `info.srcUrl` to `chrome.downloads.download` with `conflictAction: 'uniquify'` (skipping `blob:` URLs, mirroring popup-side behavior).
 
-The on-page code is still a content script registered at `document_start`:
+The on-page code is two content-script registrations, both at `document_start`:
 
 ```jsonc
 // manifest.json
 "content_scripts": [
   {
     "matches": ["<all_urls>"],
-    "js": ["content.js"],
+    "js": ["ps-hotkeys.js", "content.js"],
+    "run_at": "document_start"
+  },
+  {
+    "matches": ["<all_urls>"],
+    "js": ["ps-hotkeys.js", "content-hotkeys.js"],
+    "all_frames": true,
     "run_at": "document_start"
   }
 ]
 ```
 
-The injected `<style>` element id is `__ps_kx9w4_style`, and the live-preview node (created by the popup's **Preview on Page** button via a `PS_PREVIEW` runtime message) is `__ps_kx9w4_prev` (both deliberately neutral / randomized so anti-extension scripts cannot fingerprint them). Round-trip the same ids in `content.js` if either is ever changed. The preview node exists only until the next save/delete or a page reload and is never persisted.
+They are deliberately asymmetric: the CSS injector (`content.js`) stays **top-frame-only**, so per-domain styles are never applied inside sub-frames; the hotkey listener (`content-hotkeys.js`) runs in **every** frame so a focused `<iframe>` player answers the shortcut and a volume step reaches media the top document cannot see. `ps-hotkeys.js` is the shared contract both sides load (action ids, default bindings, combo format); it guards on `window.PSHotkeys`, so evaluating it twice in one frame is a no-op.
+
+The injected `<style>` element id is `__ps_kx9w4_style`, the live-preview node (created by the popup's **Preview on Page** button via a `PS_PREVIEW` runtime message) is `__ps_kx9w4_prev`, and the hotkey feedback toast is `__ps_kx9w4_toast` (all deliberately neutral / randomized so anti-extension scripts cannot fingerprint them). Round-trip the same ids in `content.js` / `content-hotkeys.js` if any is ever changed. The preview node exists only until the next save/delete or a page reload; the toast removes itself after ~1.8 s. Neither is persisted.
+
+Runtime message types: `PS_PREVIEW` and `PS_START_PICK` (popup / worker → content), `PS_HOTKEY` (hotkey frame → worker), `PS_VOLUME` (worker → every frame), `PS_VOL_RESULT` (frame that owns media → worker), and `PS_TOAST` (worker → top frame).
 
 ## 4. Manifest paths
 
@@ -105,7 +117,10 @@ Every path-shaped value in `domain-css-injector-v2/manifest.json` and the file i
 | `sidebar_action.default_icon["16"]` | `icons/icon16.png` | ✓ |
 | `sidebar_action.default_icon["48"]` | `icons/icon48.png` | ✓ |
 | `sidebar_action.default_icon["128"]` | `icons/icon128.png` | ✓ |
-| `content_scripts[0].js[0]` | `content.js` | `domain-css-injector-v2/content.js` ✓ |
+| `content_scripts[0].js[0]` | `ps-hotkeys.js` | `domain-css-injector-v2/ps-hotkeys.js` ✓ |
+| `content_scripts[0].js[1]` | `content.js` | `domain-css-injector-v2/content.js` ✓ |
+| `content_scripts[1].js[0]` | `ps-hotkeys.js` | `domain-css-injector-v2/ps-hotkeys.js` ✓ |
+| `content_scripts[1].js[1]` | `content-hotkeys.js` | `domain-css-injector-v2/content-hotkeys.js` ✓ (runs in all frames) |
 | `background.service_worker` | `background.js` | `domain-css-injector-v2/background.js` ✓ |
 | `background.scripts[0]` | `background.js` | `domain-css-injector-v2/background.js` ✓ (Firefox fallback) |
 
@@ -129,7 +144,7 @@ Declared in `manifest.json` (granted at install time):
 * `storage` — for `chrome.storage.local` reads/writes
 * `activeTab` — to read the active tab's URL when the popup opens
 * `scripting` — to run the video-source scanner via `chrome.scripting.executeScript`
-* `tabs` — to query / message the active tab from the popup, and to sort / dedupe / list / focus tabs across windows in the **Tabs** organizer
+* `tabs` — to query / message the active tab from the popup, to sort / dedupe / list / focus tabs across windows in the **Tabs** organizer, and for the mute hotkeys (`chrome.tabs.update({ muted })` on this tab or on every other tab, from `background.js`)
 * `tabGroups` — used by the **Tabs** organizer's _Group by domain_ action (`chrome.tabs.group` / `chrome.tabGroups`). Chrome/Edge desktop only; feature-detected at runtime and **dropped from the MV2 (Kiwi) build** (no tab-groups API there)
 * `clipboardWrite` — used by the inspect-element overlay to copy a selector
 * `downloads` — to hand a media URL to `chrome.downloads.download`
@@ -140,9 +155,10 @@ Host permission: `<all_urls>` (required because the extension targets any site t
 Runtime gestures:
 
 * Web Speech (`speechSynthesis.speak`) — gated on the **Read Selected Text** / **Read Whole Page** button clicks in `popup.js`
-* `navigator.clipboard.writeText` — gated on a click within the page during picker mode (`content.js`, in `onPickerSelect`)
+* `navigator.clipboard.writeText` — gated on a click within the page during picker mode (`content.js`, in `onPickerSelect`) — reached from the popup's **Select Container** button or the matching hotkey
 * `chrome.downloads.download` — gated on the popup's **Download Video Media** button click (`popup.js`, in `pickAndSaveMedia`), the **Screenshot Visible Page** button click (`popup.js`, in `captureScreenshot`), or the right-click context-menu **Download this video** entry handled by `background.js`
 * `chrome.tabs.captureVisibleTab` — gated on the **Screenshot Visible Page** button click (`popup.js`, in `captureScreenshot`); covered by the existing `activeTab` / `<all_urls>` grants, no new permission
+* `chrome.tabs.update({ muted })` — gated on a page hotkey the user pressed (`content-hotkeys.js` → `PS_HOTKEY` → `background.js`); covered by the existing `tabs` grant, no new permission
 * File read for **Import JSON** — gated on the user picking a file through the popup's native file input; the file is parsed locally with `FileReader`, never uploaded
 
 These gestures must stay attached to their current click handlers; moving them to module-load time will silently break the feature.
@@ -173,11 +189,11 @@ A second distributable, `pageside-<version>-kiwi.zip`, ships a **Manifest V2** m
 | `permissions: [… "scripting" … "tabGroups" …]` | `scripting` and `tabGroups` dropped (MV3/desktop-only; Kiwi has no tab-groups API) |
 | `sidebar_action`, `browser_specific_settings` | dropped (no sidebar on Kiwi; gecko key is Firefox-only) |
 
-The same `popup.js` / `content.js` / `background.js` run under both. `popup.js` routes all page injection through `injectFunc()` / `injectFile()`, which use `chrome.scripting` on MV3 and fall back to `chrome.tabs.executeScript` on MV2. CI asserts the derived MV2 manifest stays in version/name parity with `manifest.json`.
+The same `popup.js` / `content.js` / `content-hotkeys.js` / `background.js` run under both (MV2 supports `all_frames` and `chrome.tabs.update({ muted })` too). `popup.js` routes all page injection through `injectFunc()` / `injectFile()`, which use `chrome.scripting` on MV3 and fall back to `chrome.tabs.executeScript` on MV2. CI asserts the derived MV2 manifest stays in version/name parity with `manifest.json`.
 
 ### UI surface
 
-`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools / Tabs) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads five classic scripts in order: `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus` / `resolveBaseHost`), then `popup-editor.js`, `popup-notepad.js`, `popup-password.js`, and `popup-tabs.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-editor.js` listens for it to reload the per-domain draft, `popup-notepad.js` to reload the per-domain note, and `popup-tabs.js` to refresh its tab list. `popup-editor.js` persists only the `__ps_draft` key (see §1); `popup-tabs.js` persists **nothing** (it acts on live tabs), so it adds no storage key.
+`popup.html` is organized as **native `<details>`/`<summary>` collapsible sections** (Style / Notes / Password / Tools / Hotkeys / Tabs) — chosen for mobile/Kiwi viewports: each tool collapses to a 44px tap target, no JS toggle logic, keyboard-accessible. The base font is `16px` (`18px` at `min-width:520px`) and the body honors `env(safe-area-inset-*)` for notched phones. It loads seven classic scripts in order: `ps-hotkeys.js` (the shared hotkey contract, also a content script), `popup.js` (orchestrator — owns `activeHost`, the poll loop, shared `showStatus` / `resolveBaseHost`), then `popup-editor.js`, `popup-notepad.js`, `popup-password.js`, `popup-tabs.js`, and `popup-hotkeys.js`, which share that global scope. `popup.js` broadcasts a `ps:hostchange` `CustomEvent` on every domain switch; `popup-editor.js` listens for it to reload the per-domain draft, `popup-notepad.js` to reload the per-domain note, and `popup-tabs.js` to refresh its tab list. `popup-editor.js` persists only the `__ps_draft` key and `popup-hotkeys.js` only `__ps_hotkeys` (see §1); `popup-tabs.js` persists **nothing** (it acts on live tabs), so it adds no storage key. The Hotkeys section is the one surface that is **not** per-domain — its bindings are global, so it ignores `ps:hostchange`.
 
 ---
 

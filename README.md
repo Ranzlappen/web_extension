@@ -8,9 +8,9 @@
 
 ## What this is
 
-A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The Style editor includes a **live preview** (see the CSS on the page before saving), a **per-site on/off switch** (keep the snippet, skip the injection), and **quick presets** (dark mode, hide sticky/cookie bars, readable text, bigger text) as starting points. The CSS editor has line numbers, Tab / auto-indent handling, Ctrl/Cmd+S to save, and keeps an unsaved draft per domain so closing the popup mid-edit loses nothing. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, an **element hider** (tap anything on the page and a `display:none` rule is saved for the site instantly), a Web-Speech TTS reader for **selected text or the whole page** with an adjustable speed, a **one-tap screenshot** of the visible page, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, **JSON export and import** of all snippets, a **per-domain notepad** for private site notes, a **cryptographic password / passphrase generator**, and a **tab organizer** that sorts, groups by domain, de-duplicates, and lists your open tabs across every window.
+A lightweight browser extension that lets you author and persist a CSS snippet per domain. Open the popup (Chrome/Edge) or the sidebar panel (Opera/Firefox), type CSS, and it is injected into every page on that domain on every visit. The Style editor includes a **live preview** (see the CSS on the page before saving), a **per-site on/off switch** (keep the snippet, skip the injection), and **quick presets** (dark mode, hide sticky/cookie bars, readable text, bigger text) as starting points. The CSS editor has line numbers, Tab / auto-indent handling, Ctrl/Cmd+S to save, and keeps an unsaved draft per domain so closing the popup mid-edit loses nothing. The popup also exposes a quick element inspector that copies a CSS selector to the clipboard, an **element hider** (tap anything on the page and a `display:none` rule is saved for the site instantly), a Web-Speech TTS reader for **selected text or the whole page** with an adjustable speed, a **one-tap screenshot** of the visible page, a media-URL extractor that can download `<video>` sources straight from the active tab, a right-click **Download this video** entry on any video element on the page, **JSON export and import** of all snippets, a **per-domain notepad** for private site notes, a **cryptographic password / passphrase generator**, a **tab organizer** that sorts, groups by domain, de-duplicates, and lists your open tabs across every window, and **page hotkeys** for the element picker, tab muting (this tab or every other one), and the volume of whatever is playing.
 
-The UI is organized into collapsible sections (Style / Notes / Password / Tools / Tabs) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
+The UI is organized into collapsible sections (Style / Notes / Password / Tools / Hotkeys / Tabs) tuned for mobile viewports — large tap targets, safe-area padding, and no horizontal overflow on a phone like Kiwi.
 
 Everything is stored locally via `chrome.storage.local` — there is no server, no account, and no telemetry. Generated passwords are never stored.
 
@@ -39,6 +39,9 @@ The most common tasks. For anything not listed, see [Developer Setup](#developer
 | Keep a private note for a site | Open the **Notes** section, type — it auto-saves per domain (or tap **Save note**). |
 | Generate a strong password | Open the **Password** section, set the options, tap **Generate**, then **Copy**. |
 | Organize / sort open tabs | Open the **Tabs** section, pick a sort order and tap **Sort tabs**, **Group by domain** (Chrome desktop), or **Close duplicates**. Filter the list and click a tab to jump to it. |
+| Mute the tab from the keyboard | Press **Alt+Shift+M** on the page. **Alt+Shift+O** mutes every *other* tab; press again to unmute. |
+| Turn a video down without hunting for its slider | Press **Alt+Shift+↑** / **Alt+Shift+↓** on the page — works on embedded players too. |
+| Change a shortcut | Open the **Hotkeys** section, tap **Change** next to it, and press the combination you want. |
 | Back up all snippets | Open the editor, click **Export JSON**. (Private notes are never included in the export.) |
 | Restore a backup | Open the editor, click **Import JSON**, pick the exported file — snippets merge in (existing domains are overwritten, notes/internal state untouched). |
 
@@ -312,6 +315,45 @@ The **Tabs** section operates on every open tab across all your windows. It stor
 
 ---
 
+## Hotkeys
+
+The **Hotkeys** section (below **Tools**) lists the keyboard shortcuts that work
+on the page you are viewing. They are on by default:
+
+| Action | Default | What it does |
+| --- | --- | --- |
+| Select container | **Alt+Shift+S** | Starts the element picker without opening the panel — hover, click, and the selector is on your clipboard. |
+| Mute / unmute this tab | **Alt+Shift+M** | Toggles the browser's own tab mute (the speaker icon on the tab). |
+| Mute / unmute all other tabs | **Alt+Shift+O** | Mutes every other tab across all windows. Press again and they all come back. |
+| Volume up | **Alt+Shift+↑** | Raises the volume of the page's audio / video in 10% steps. |
+| Volume down | **Alt+Shift+↓** | Lowers it the same way. |
+
+Each action briefly confirms itself with a small toast at the bottom of the page
+("Tab muted", "Volume 60%").
+
+**Re-binding.** Tap **Change** next to a shortcut and press the combination you
+want; **Esc** cancels and **Reset to defaults** restores all five. A combination
+needs at least one modifier (Ctrl, Alt, Shift or Meta) — or an F-key — so it
+cannot collide with ordinary typing, and a combination already in use is
+refused rather than silently stolen. Changes take effect on pages that are
+already open, no reload needed. The **Enable page hotkeys** tick box switches
+the whole lot off; nothing is listening while it is unticked.
+
+Good to know:
+
+* Shortcuts are matched **on the web page**, so they do nothing while the focus
+  is in the browser's own UI, on `chrome://` pages, or on a page that was
+  already open when you installed / reloaded the extension (reload it once).
+* They are ignored while you type in a text box, a text area, or any editable
+  element.
+* **Volume** adjusts the page's `<video>` / `<audio>` elements — including ones
+  inside embedded players from another site — and resets when the page reloads.
+  It is separate from the tab mute: a muted tab stays muted.
+* Bindings are stored once for all sites (not per domain) and, like everything
+  else, never leave your browser.
+
+---
+
 ## Project Structure
 
 ```
@@ -323,8 +365,11 @@ opera/
 │   ├── popup-notepad.js         ← per-domain notepad
 │   ├── popup-password.js        ← crypto password / passphrase generator
 │   ├── popup-tabs.js            ← tab organizer (sort / group / dedupe / list)
+│   ├── popup-hotkeys.js         ← Hotkeys section (list / re-record bindings)
+│   ├── ps-hotkeys.js            ← shared hotkey contract (popup + content scripts)
 │   ├── content.js               ← injects CSS, runs the inspect-element overlay
-│   ├── background.js            ← service worker — context-menu video downloads
+│   ├── content-hotkeys.js       ← page hotkey listener, volume + toast (all frames)
+│   ├── background.js            ← service worker — hotkey actions, context-menu video downloads
 │   └── icons/                   ← 16 / 48 / 128 px PNG icons
 ├── tools/                       ← build helpers (no runtime code)
 │   ├── build-kiwi-manifest.mjs  ← derives the Manifest V2 manifest from manifest.json
