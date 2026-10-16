@@ -406,6 +406,7 @@ async function collectMediaSources() {
                 candidates.push({
                     url: trimmed,
                     source,
+                    pageUrl: location.href,
                     ...extra
                 });
             }
@@ -457,6 +458,9 @@ async function collectMediaSources() {
         return [];
     }
 
+    // about:blank / srcdoc frames have no fetchable page URL of their own, so
+    // fall back to the tab's URL for the command-line hint.
+    const tabUrl = /^https?:/i.test(tab.url || '') ? tab.url : '';
     const merged = [];
     const dedup = new Set();
     (results || []).forEach((frameCandidates) => {
@@ -468,6 +472,7 @@ async function collectMediaSources() {
             merged.push({
                 ...candidate,
                 url: normalizedUrl,
+                pageUrl: /^https?:/i.test(candidate?.pageUrl || '') ? candidate.pageUrl : tabUrl,
                 downloadable: !normalizedUrl.startsWith('blob:'),
                 likelyMediaFile: looksLikeMedia(normalizedUrl)
             });
@@ -485,7 +490,7 @@ async function collectMediaSources() {
 
 function downloadCandidate(candidate) {
     if (!candidate || !candidate.downloadable) {
-        showStatus('That media is a blob stream and cannot be downloaded directly.', 3500);
+        showStatus('That media is a blob stream — use the command below the list.', 3500);
         return;
     }
     chrome.downloads.download({
@@ -498,6 +503,126 @@ function downloadCandidate(candidate) {
         }
         showStatus('Video download started.', 3000);
     });
+}
+
+// blob: URLs are MediaSource handles that only exist inside the page, and
+// .m3u8/.mpd are playlists of segments rather than a file — neither can be
+// saved via chrome.downloads. For those, hand the user a generic yt-dlp
+// command instead: the page URL for blobs (yt-dlp resolves the stream itself),
+// the manifest URL (+ referer) for HLS/DASH. Deliberately site-agnostic.
+function isStreamManifest(url) {
+    return /\.(m3u8|mpd)(\?|#|$)/i.test(url);
+}
+
+function shQuote(s) {
+    return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+function cmdQuote(s) {
+    // A normalized URL never carries a raw quote, but never let one end the arg.
+    return `"${s.replace(/"/g, '%22')}"`;
+}
+
+function buildFetchCommands(list) {
+    const seen = new Set();
+    const out = [];
+    list.forEach((c) => {
+        let target = '';
+        let referer = '';
+        if (c.url.startsWith('blob:')) {
+            target = c.pageUrl;
+        } else if (isStreamManifest(c.url)) {
+            target = c.url;
+            referer = c.pageUrl && c.pageUrl !== c.url ? c.pageUrl : '';
+        }
+        if (!target || seen.has(target)) return;
+        seen.add(target);
+        const refSh = referer ? ` --referer ${shQuote(referer)}` : '';
+        const refCmd = referer ? ` --referer ${cmdQuote(referer)}` : '';
+        out.push({
+            label: c.url.startsWith('blob:') ? 'Page with blob stream' : 'Stream playlist',
+            target,
+            termux: `yt-dlp -P ~/storage/downloads${refSh} ${shQuote(target)}`,
+            windows: `yt-dlp${refCmd} ${cmdQuote(target)}`
+        });
+    });
+    return out;
+}
+
+function copyText(text) {
+    const fallback = () => {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.top = '-1000px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            return ok;
+        } catch (_) { return false; }
+    };
+    const done = (ok) => showStatus(ok ? 'Command copied.' : 'Copy failed — long-press the command to copy.', 2000);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => done(true)).catch(() => done(fallback()));
+    } else {
+        done(fallback());
+    }
+}
+
+function renderCmdRow(parent, label, text) {
+    const row = document.createElement('div');
+    row.className = 'cmd-row';
+    const head = document.createElement('div');
+    head.className = 'cmd-head';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cmd-copy';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => copyText(text));
+    head.appendChild(name);
+    head.appendChild(btn);
+    const code = document.createElement('code');
+    code.textContent = text;
+    row.appendChild(head);
+    row.appendChild(code);
+    parent.appendChild(row);
+}
+
+function renderFetchCommands(container, list) {
+    const cmds = buildFetchCommands(list);
+    if (!cmds.length) return;
+    const box = document.createElement('div');
+    box.className = 'cmd-box';
+    const h = document.createElement('div');
+    h.className = 'media-title';
+    h.textContent = 'Download with a command instead';
+    box.appendChild(h);
+    const intro = document.createElement('div');
+    intro.className = 'hint';
+    intro.textContent = 'Streams can\'t be saved from the browser. Run one of these with yt-dlp '
+        + '(DRM-protected video won\'t work; for logged-in pages on desktop add '
+        + '--cookies-from-browser chrome).';
+    box.appendChild(intro);
+    cmds.forEach((cmd) => {
+        const t = document.createElement('div');
+        t.className = 'small';
+        t.textContent = `${cmd.label}: ${cmd.target}`;
+        box.appendChild(t);
+        renderCmdRow(box, 'Termux (Android)', cmd.termux);
+        renderCmdRow(box, 'Windows (cmd)', cmd.windows);
+    });
+    const setup = document.createElement('div');
+    setup.className = 'hint';
+    setup.textContent = 'One-time setup:';
+    box.appendChild(setup);
+    renderCmdRow(box, 'Termux', 'pkg install -y python ffmpeg && pip install -U yt-dlp && termux-setup-storage');
+    renderCmdRow(box, 'Windows', 'winget install yt-dlp.yt-dlp && winget install Gyan.FFmpeg');
+    container.appendChild(box);
 }
 
 // Renders the found media as an in-popup tappable list. prompt() is unreliable
@@ -525,12 +650,13 @@ function renderMediaCandidates(list) {
         btn.appendChild(urlEl);
         if (!candidate.downloadable) {
             btn.disabled = true;
-            btn.title = 'Blob stream — cannot be downloaded directly';
+            btn.title = 'Blob stream — use the command below';
         } else {
             btn.addEventListener('click', () => downloadCandidate(candidate));
         }
         container.appendChild(btn);
     });
+    renderFetchCommands(container, list);
 }
 /* __PS_STORE_STRIP_END__ */
 

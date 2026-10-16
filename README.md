@@ -270,6 +270,7 @@ This is the fastest path when you can see the video you want. It uses the `conte
 2. Open the editor and click **Download Video Media**.
 3. The popup scans every frame for `video.currentSrc`, `<source>` tags, media-typed `<a href>` links, and network resource entries.
 4. Found sources appear as an in-popup tappable list, ranked by likelihood of being a real downloadable file. Tap one to download it. (Blob streams are shown disabled — they cannot be fetched directly.)
+5. For blob streams and HLS/DASH playlists (`.m3u8` / `.mpd`), the list ends with a **Download with a command instead** box: a ready-to-paste [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) command for **Termux (Android)** and **Windows (cmd)**, each with a Copy button, plus the one-time install line. Blobs get the page URL (yt-dlp resolves the stream itself); playlists get the manifest URL with the page as `--referer`. DRM-protected video can't be fetched this way; for logged-in pages on desktop add `--cookies-from-browser chrome`.
 
 Use B when the video tag is hidden, lazy-loaded, or you need an alternate quality / source URL.
 
