@@ -77,7 +77,7 @@ const check = spawnSync('node', ['--check', join(OUT, 'popup.js')], { encoding: 
 if (check.status !== 0) {
   throw new Error(`stripped popup.js failed node --check:\n${check.stderr}`);
 }
-const leftovers = /captureScreenshot|pickAndSaveMedia|collectMediaSources|downloadVideoBtn|screenshotBtn|mediaList|chrome\.downloads|chrome\.contextMenus/;
+const leftovers = /captureScreenshot|pickAndSaveMedia|collectMediaSources|buildFetchCommands|downloadVideoBtn|screenshotBtn|mediaList|chrome\.downloads|chrome\.contextMenus/;
 for (const file of ['popup.js', 'popup.html']) {
   const body = readFileSync(join(OUT, file), 'utf8');
   const hit = body.match(leftovers);
