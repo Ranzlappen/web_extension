@@ -324,6 +324,7 @@ opera/
 │   ├── popup-notepad.js         ← per-domain notepad
 │   ├── popup-password.js        ← crypto password / passphrase generator
 │   ├── popup-tabs.js            ← tab organizer (sort / group / dedupe / list)
+│   ├── popup-manager.js         ← snippet manager (list / edit / add / delete all snippets)
 │   ├── content.js               ← injects CSS, runs the inspect-element overlay
 │   ├── background.js            ← service worker — context-menu video downloads
 │   └── icons/                   ← 16 / 48 / 128 px PNG icons
