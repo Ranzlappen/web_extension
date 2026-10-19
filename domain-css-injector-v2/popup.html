@@ -67,6 +67,15 @@
         .tab-row{display:flex;gap:6px;align-items:stretch;margin:4px 0}
         .tab-open{flex:1 1 auto;width:auto;margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .tab-close{flex:0 0 44px;width:44px;margin:0;}
+        /* Snippet manager overlay (popup-manager.js) */
+        #mgrOverlay{position:fixed;inset:0;z-index:10;background:#0f121c;overflow:auto;box-sizing:border-box;
+            padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));}
+        #mgrOverlay[hidden]{display:none}
+        #mgrMsg{min-height:22px;margin:8px 0;color:#cfd2dc}
+        .mgr-row{border:1px solid #2a2f44;border-radius:8px;background:#11151f;padding:8px;margin:8px 0}
+        .mgr-row .small{font-family:monospace;white-space:pre-wrap;margin-top:4px}
+        #mgrDomain{width:100%;box-sizing:border-box;min-height:44px;background:#161a26;color:#e6e8ef;border:1px solid #2a2f44;border-radius:8px;padding:8px;margin-bottom:8px}
+        #mgrCss{height:50vh;min-height:160px;white-space:pre}
         /* Support footer — a plain text link (deliberately NOT the hosted
            Ko-fi button image: the popup must never fetch remote resources). */
         .footer{text-align:center;margin-top:14px;padding:6px 0}
@@ -101,6 +110,7 @@ body    {style:example;}
                     <button id="deleteBtn">Delete Style for this Page</button>
                     <button id="inspectBtn">Select Container</button>
                     <button id="hideBtn">Hide Element</button>
+                    <button id="manageBtn" type="button">Manage All Snippets</button>
                 </div>
                 <div class="hint" style="margin-top:10px">Quick presets — added to the editor, then Preview or Save:</div>
                 <div class="controls">
@@ -206,11 +216,35 @@ body    {style:example;}
         <div class="footer">
             <a id="kofiLink" href="https://ko-fi.com/F1F1140LWT" target="_blank" rel="noopener">☕ Support this project</a>
         </div>
+
+    <div id="mgrOverlay" hidden role="dialog" aria-label="Snippet manager">
+        <h3>All snippets</h3>
+        <div id="mgrMsg" aria-live="polite"></div>
+        <div id="mgrListWrap">
+            <div class="hint" id="mgrCount"></div>
+            <div class="controls">
+                <button id="mgrAdd" type="button">Add snippet</button>
+                <button id="mgrClose" type="button">Close</button>
+            </div>
+            <div id="mgrList"></div>
+        </div>
+        <div id="mgrForm" hidden>
+            <h4 id="mgrFormTitle">Add snippet</h4>
+            <label class="small" for="mgrDomain">Domain (e.g. example.com)</label>
+            <input id="mgrDomain" type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <textarea id="mgrCss" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="body { color: red; }"></textarea>
+            <div class="controls">
+                <button id="mgrSave" type="button">Save</button>
+                <button id="mgrCancel" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
     <script src="popup.js"></script>
     <script src="popup-editor.js"></script>
     <script src="popup-notepad.js"></script>
     <script src="popup-password.js"></script>
     <script src="popup-tabs.js"></script>
+    <script src="popup-manager.js"></script>
 </body>
 
 </html>
